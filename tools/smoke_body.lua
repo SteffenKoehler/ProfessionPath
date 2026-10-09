@@ -83,3 +83,15 @@ print("gathering ok")
 -- zone names come from the world map by map file name (Howling Fjord = area 495)
 assert(SP.Gather.ZoneName(495) == "Heulender Fjord", "zone name by map file: " .. SP.Gather.ZoneName(495))
 print("zone names ok")
+
+-- still needed check: avoid every material of First Aid 150-210 and refresh the window
+SP:Show(129)
+for _, r in ipairs(SkillPathData.recipes[129]) do
+	for i = 11, #r, 2 do
+		if not SP:IsAvoided(r[i], 129) then SP:ToggleAvoid(r[i], 129) end
+	end
+end
+SP:Refresh()
+SkillPathDB.avoided[129] = nil
+SP:Refresh()
+print("still needed ok")

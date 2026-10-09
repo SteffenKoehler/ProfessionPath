@@ -116,7 +116,18 @@ local function ShowMaterialTooltip(row)
 	end
 	ShowItemTooltip(row)
 	GameTooltip:AddLine(" ")
-	if SP:IsAvoided(row.item, selected) then
+	local m = row.material
+	if SP:IsAvoided(row.item, selected) and m and m.need > 0 then
+		GameTooltip:AddLine(L["Avoided, but still needed: in this skill range no other recipe gives enough skill points."], 1, 0.82, 0, true)
+		if m.usedBy and #m.usedBy > 0 then
+			GameTooltip:AddLine(L["Used by:"], 0.7, 0.7, 0.7)
+			for _, step in ipairs(m.usedBy) do
+				GameTooltip:AddLine(format("  %s (%d-%d)", SP:RecipeName(step.recipe[F.SPELL]), step.from, step.to), 1, 1, 1)
+			end
+		end
+		GameTooltip:AddLine(L["Only for this profession."], 0.7, 0.7, 0.7)
+		GameTooltip:AddLine(L["Right-click: use again"], 0.6, 0.8, 1)
+	elseif SP:IsAvoided(row.item, selected) then
 		GameTooltip:AddLine(L["Avoided: the route only uses it if there is no alternative."], 1, 0.4, 0.4, true)
 		GameTooltip:AddLine(L["Only for this profession."], 0.7, 0.7, 0.7)
 		GameTooltip:AddLine(L["Right-click: use again"], 0.6, 0.8, 1)
@@ -281,11 +292,22 @@ local function Build()
 	end
 
 	local total = 0
+	local usedBy = {}
+	for _, step in ipairs(steps) do
+		if step.to > rank then
+			local r = step.recipe
+			for i = F.REAGENTS, #r, 2 do
+				usedBy[r[i]] = usedBy[r[i]] or {}
+				table.insert(usedBy[r[i]], step)
+			end
+		end
+	end
 	for item, count in pairs(Planner.Materials(steps, rank)) do
 		if count > 0 then
 			local have = GetItemCount(item, true)
-			materials[#materials + 1] = {item = item, need = count, have = have}
-			if not SP:IsAvoided(item, selected) and have < count then
+			materials[#materials + 1] = {item = item, need = count, have = have, usedBy = usedBy[item]}
+			-- avoided materials the route still needs are bought too, at market price
+			if have < count then
 				total = total + (count - have) * SP:Price(item)
 			end
 		end
@@ -403,6 +425,8 @@ local function UpdateMaterials()
 		elseif m.gather then
 			row:Show()
 			row.avoidButton:Hide()
+			row.warn:Hide()
+			row.material = nil
 			local c = m.gather
 			local color = COLORS[Gather.Color(c.req, math.max(1, rank))]
 			row.icon:SetDesaturated(false)
@@ -425,12 +449,20 @@ local function UpdateMaterials()
 			row.icon:SetTexture(SP:ItemIcon(m.item))
 			row.avoidButton:Show()
 			row.avoidButton.icon:SetTexture(SP:IsAvoided(m.item, selected) and USE_AGAIN_ICON or AVOID_ICON)
-			if SP:IsAvoided(m.item, selected) then
+			row.material = m
+			if SP:IsAvoided(m.item, selected) and m.need > 0 then
+				-- avoided, but the route cannot do without it
+				row.warn:Show()
+				row.icon:SetDesaturated(false)
+				row.text:SetText(color and (color.hex .. name .. "|r") or name)
+				row.right:SetText(format("|cffffd100%s|r  %s", L["still needed"], format(L["have %d / need %d"], m.have, m.need)))
+			elseif SP:IsAvoided(m.item, selected) then
+				row.warn:Hide()
 				row.icon:SetDesaturated(true)
 				row.text:SetText("|cff808080" .. name .. "|r")
-				row.right:SetText(m.need > 0 and format("|cffff6666%s|r  %s", L["avoided"], format(L["have %d / need %d"], m.have, m.need))
-					or format("|cffff6666%s|r", L["avoided"]))
+				row.right:SetText(format("|cffff6666%s|r", L["avoided"]))
 			else
+				row.warn:Hide()
 				row.icon:SetDesaturated(false)
 				row.text:SetText(color and (color.hex .. name .. "|r") or name)
 				local ok = m.have >= m.need
@@ -709,6 +741,13 @@ local function CreateMainFrame()
 		row.avoidButton = avoid
 		row.right:ClearAllPoints()
 		row.right:SetPoint("RIGHT", avoid, "LEFT", -4, 0)
+		-- yellow "!" for avoided materials the route still needs
+		row.warn = row:CreateTexture(nil, "OVERLAY")
+		row.warn:SetWidth(14)
+		row.warn:SetHeight(14)
+		row.warn:SetPoint("RIGHT", row.right, "LEFT", -2, 0)
+		row.warn:SetTexture("Interface\\GossipFrame\\AvailableQuestIcon")
+		row.warn:Hide()
 		matRows[i] = row
 	end
 
