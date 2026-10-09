@@ -83,6 +83,16 @@ local function ShowStepTooltip(row)
 	GameTooltip:Show()
 end
 
+-- full text of a note, in case it is cut off in the row
+local function ShowNoteTooltip(row)
+	local entry = row.entry
+	if entry and entry.note then
+		GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
+		GameTooltip:SetText(entry.note, 1, 1, 1, 1, true)
+		GameTooltip:Show()
+	end
+end
+
 local function ShowItemTooltip(row)
 	if row.item then
 		GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
@@ -122,8 +132,8 @@ local function Build()
 		while SP.RANKS[nextRank] and step.to > SP.RANKS[nextRank].cap do
 			local r = SP.RANKS[nextRank]
 			if maxRank <= r.cap then
-				entries[#entries + 1] = {note = format(L["Learn %s at your trainer (skill %d, level %d) - needed to go past %d."],
-					L[r.name], r.skill, r.level, r.cap), color = "66ccff"}
+				entries[#entries + 1] = {note = format(L["Learn %s at your trainer (from skill %d, level %d)"],
+					L[r.name], r.skill, r.level), color = "66ccff"}
 			end
 			nextRank = nextRank + 1
 		end
@@ -165,9 +175,12 @@ local function UpdateRoute()
 		else
 			row:Show()
 			row.right:SetText("")
+			-- notes use the full width, other rows leave room for the count on the right
+			row.text:SetPoint("RIGHT", row, "RIGHT", entry.note and -2 or -90, 0)
 			if entry.note then
 				row.icon:SetTexture(nil)
 				row.text:SetText("|cff" .. entry.color .. entry.note .. "|r")
+				row:SetScript("OnEnter", ShowNoteTooltip)
 			elseif entry.recipe then
 				local r = entry.recipe
 				local spell = r[F.SPELL]
@@ -406,10 +419,17 @@ function SP:AttachTradeSkillButton()
 		return
 	end
 	local button = CreateFrame("Button", "SkillPathTradeSkillButton", TradeSkillFrame, "UIPanelButtonTemplate")
-	button:SetWidth(80)
-	button:SetHeight(20)
+	button:SetWidth(72)
+	button:SetHeight(18)
 	button:SetText("SkillPath")
-	button:SetPoint("TOPRIGHT", TradeSkillFrame, "TOPRIGHT", -40, -44)
+	-- next to the close button: present in the Blizzard window and in skins like ElvUI,
+	-- which move the filters and search box around
+	local close = TradeSkillFrameCloseButton
+	if close then
+		button:SetPoint("RIGHT", close, "LEFT", -2, 0)
+	else
+		button:SetPoint("TOPRIGHT", TradeSkillFrame, "TOPRIGHT", -40, -14)
+	end
 	button:SetScript("OnClick", function()
 		local name = GetTradeSkillLine()
 		SP:Show(name and SP.nameToSkill[name])
