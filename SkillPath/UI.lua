@@ -85,19 +85,44 @@ local function LearnHint(r)
 	end
 end
 
-local function ShowBookTooltip(book)
-	local entry = book:GetParent().entry
-	if not (entry and entry.step) then
+-- Where an unknown recipe comes from, shown with the icons of the NPC dialogs:
+-- trainer book, vendor bag, scroll for drops, tokens and quests
+local SOURCE_ICONS = {
+	[Planner.SOURCE_TRAINER] = "Interface\\GossipFrame\\TrainerGossipIcon",
+	[Planner.SOURCE_VENDOR] = "Interface\\GossipFrame\\VendorGossipIcon",
+	[Planner.SOURCE_OTHER] = "Interface\\Icons\\INV_Scroll_03",
+}
+local SOURCE_TITLES = {
+	[Planner.SOURCE_TRAINER] = "Learn the recipe at the trainer",
+	[Planner.SOURCE_VENDOR] = "Buy the recipe from a vendor",
+	[Planner.SOURCE_OTHER] = "Recipe from a drop, tokens or a quest",
+}
+
+local function EntryRecipe(entry)
+	return entry and (entry.step and entry.step.recipe or entry.recipe)
+end
+
+local function ShowSourceTooltip(button)
+	local r = EntryRecipe(button:GetParent().entry)
+	if not r then
 		return
 	end
-	GameTooltip:SetOwner(book, "ANCHOR_RIGHT")
-	GameTooltip:SetText(L["Recipe not learned yet"])
-	local text, r, g, b = LearnHint(entry.step.recipe)
+	GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
+	GameTooltip:SetText(L[SOURCE_TITLES[r[F.SOURCE]] or "Recipe not learned yet"])
+	local text, red, green, blue = LearnHint(r)
 	if text then
-		GameTooltip:AddLine(text, r, g, b, true)
+		GameTooltip:AddLine(text, red, green, blue, true)
 	end
-	GameTooltip:AddLine(L["The book disappears once you have learned the recipe and opened the profession window."], 0.7, 0.7, 0.7, true)
+	GameTooltip:AddLine(L["The icon disappears once you have learned the recipe and opened the profession window."], 0.7, 0.7, 0.7, true)
 	GameTooltip:Show()
+end
+
+-- Shows the source icon on a route row if the recipe still has to be learned
+local function SetSourceIcon(row, r)
+	if r and LearnHint(r) and SOURCE_ICONS[r[F.SOURCE]] then
+		row.book.icon:SetTexture(SOURCE_ICONS[r[F.SOURCE]])
+		row.book:Show()
+	end
 end
 
 local function ShowStepTooltip(row)
@@ -419,6 +444,7 @@ local function UpdateRoute()
 				row.text:SetText(format("  %s", itemName))
 				row.right:SetText(format("|cff808080%d-%d|r", r[F.LEARN], r[F.GREY]))
 				row.item = Data.recipeItem[spell]
+				SetSourceIcon(row, r)
 				row:SetScript("OnEnter", ShowItemTooltip)
 			else
 				local step = entry.step
@@ -436,8 +462,8 @@ local function UpdateRoute()
 				local color = done and COLORS.grey or COLORS[Planner.Color(r, math.max(rank, step.from))]
 				row.text:SetText(format("|cffaaaaaa%3d-%3d|r  |cff%s%s|r", step.from, step.to, color, name))
 				row.right:SetText(done and "" or format("x%d", crafts))
-				if not done and LearnHint(r) then
-					row.book:Show()
+				if not done then
+					SetSourceIcon(row, r)
 				end
 				row:SetScript("OnEnter", ShowStepTooltip)
 			end
@@ -714,10 +740,9 @@ local function CreateMainFrame()
 		book:SetHeight(14)
 		book:SetPoint("RIGHT", row.right, "LEFT", -4, 0)
 		book:SetFrameLevel(row:GetFrameLevel() + 1)
-		local icon = book:CreateTexture(nil, "ARTWORK")
-		icon:SetAllPoints()
-		icon:SetTexture("Interface\\Icons\\INV_Misc_Book_09")
-		book:SetScript("OnEnter", ShowBookTooltip)
+		book.icon = book:CreateTexture(nil, "ARTWORK")
+		book.icon:SetAllPoints()
+		book:SetScript("OnEnter", ShowSourceTooltip)
 		book:SetScript("OnLeave", function()
 			GameTooltip:Hide()
 		end)
