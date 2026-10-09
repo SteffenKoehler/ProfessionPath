@@ -77,6 +77,7 @@ GetMapZones = function(c) if c == 1 then return "Grizzlyhuegel", "Heulender Fjor
 SetMapZoom = function(c, i) zoomed = (c == 1) and ({"GrizzlyHills", "HowlingFjord"})[i] or nil end
 GetMapInfo = function() return zoomed end
 SetMapToCurrentZone = noop
+CloseDropDownMenus = noop
 UnitFactionGroup = function() return "Horde" end
 """
 

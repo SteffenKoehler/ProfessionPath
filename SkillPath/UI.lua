@@ -17,7 +17,9 @@ local frame, routeScroll, matScroll, dropdown, status, vendorCheck
 local routeRows, matRows = {}, {}
 local entries, materials = {}, {}
 local materialTotal = 0
-local matLabel, priceLabel
+local matLabel, priceLabel, hintLabel
+local AVOID_ICON = "Interface\\Buttons\\UI-GroupLoot-Pass-Up"
+local USE_AGAIN_ICON = "Interface\\Buttons\\UI-RefreshButton"
 local selected, rank = nil, 0
 local gathering = false
 local dirty, sinceRefresh, retries = true, 0, 0
@@ -390,6 +392,7 @@ local function UpdateMaterials()
 			row:Hide()
 		elseif m.gather then
 			row:Show()
+			row.avoidButton:Hide()
 			local c = m.gather
 			local color = COLORS[Gather.Color(c.req, math.max(1, rank))]
 			row.icon:SetDesaturated(false)
@@ -410,6 +413,8 @@ local function UpdateMaterials()
 			local name, color = SP:ItemName(m.item)
 			row.item = m.item
 			row.icon:SetTexture(SP:ItemIcon(m.item))
+			row.avoidButton:Show()
+			row.avoidButton:SetNormalTexture(SkillPathDB.avoid[m.item] and USE_AGAIN_ICON or AVOID_ICON)
 			if SkillPathDB.avoid[m.item] then
 				row.icon:SetDesaturated(true)
 				row.text:SetText("|cff808080" .. name .. "|r")
@@ -432,9 +437,11 @@ local function UpdateMaterials()
 			matLabel:SetText(L["Gives skill points at your skill now"])
 		end
 		priceLabel:SetText("")
+		hintLabel:SetText("")
 		vendorCheck:Hide()
 		return
 	end
+	hintLabel:SetText(#materials > 0 and L["X: avoid a material"] or "")
 	vendorCheck:Show()
 	local source = SP:PriceSource()
 	matLabel:SetText(format("%s  |cffffffff~%s|r", L["Materials for the rest of the route"],
@@ -489,18 +496,81 @@ local function Select(line)
 	end
 end
 
-local function InitDropdown()
+-- Professions grouped like in the game: crafting, gathering, secondary skills
+local GROUPS = {
+	{key = "crafting", name = "Crafting", lines = {171, 164, 333, 202, 773, 755, 165, 197}},
+	{key = "gathering", name = "Gathering", lines = {182, 186, 393}},
+	{key = "secondary", name = "Secondary skills", lines = {129, 185, 356}},
+}
+
+local function ByName(lines)
+	local sorted = {}
+	for i, line in ipairs(lines) do
+		sorted[i] = line
+	end
+	table.sort(sorted, function(a, b)
+		return (SP.skillName[a] or "") < (SP.skillName[b] or "")
+	end)
+	return sorted
+end
+
+local function AddTitle(text, level)
+	local info = UIDropDownMenu_CreateInfo()
+	info.text = text
+	info.isTitle = true
+	info.notCheckable = true
+	UIDropDownMenu_AddButton(info, level)
+end
+
+local function AddProfession(line, profs, level)
+	local info = UIDropDownMenu_CreateInfo()
+	local p = profs[line]
+	info.text = (SP.skillName[line] or "?") .. (p and format(" |cffaaaaaa(%d)|r", p.rank) or "")
+	info.value = line
+	info.checked = line == selected
+	info.func = function()
+		Select(line)
+		CloseDropDownMenus()
+	end
+	UIDropDownMenu_AddButton(info, level)
+end
+
+-- Level 1: your professions, then the groups; level 2: all professions of a group
+local function InitDropdown(_, level)
+	level = level or 1
 	local profs = SP:GetProfessions()
-	for _, line in ipairs(SP.skillOrder) do
-		local info = UIDropDownMenu_CreateInfo()
-		local p = profs[line]
-		info.text = (SP.skillName[line] or "?") .. (p and format(" |cffaaaaaa(%d)|r", p.rank) or "")
-		info.value = line
-		info.checked = line == selected
-		info.func = function()
-			Select(line)
+	if level == 1 then
+		local mine = {}
+		for _, group in ipairs(GROUPS) do
+			for _, line in ipairs(group.lines) do
+				if profs[line] then
+					mine[#mine + 1] = line
+				end
+			end
 		end
-		UIDropDownMenu_AddButton(info)
+		if #mine > 0 then
+			AddTitle(L["Your professions"], level)
+			for _, line in ipairs(ByName(mine)) do
+				AddProfession(line, profs, level)
+			end
+		end
+		AddTitle(L["All professions"], level)
+		for _, group in ipairs(GROUPS) do
+			local info = UIDropDownMenu_CreateInfo()
+			info.text = L[group.name]
+			info.value = group.key
+			info.hasArrow = true
+			info.notCheckable = true
+			UIDropDownMenu_AddButton(info, level)
+		end
+	elseif level == 2 then
+		for _, group in ipairs(GROUPS) do
+			if group.key == UIDROPDOWNMENU_MENU_VALUE then
+				for _, line in ipairs(ByName(group.lines)) do
+					AddProfession(line, profs, level)
+				end
+			end
+		end
 	end
 end
 
@@ -595,8 +665,40 @@ local function CreateMainFrame()
 				end
 			end
 		end)
+		-- visible button to avoid the material (right-click on the row does the same)
+		local avoid = CreateFrame("Button", nil, row)
+		avoid:SetWidth(14)
+		avoid:SetHeight(14)
+		avoid:SetPoint("RIGHT", row, "RIGHT", -2, 0)
+		avoid:SetFrameLevel(row:GetFrameLevel() + 1)
+		avoid:SetHighlightTexture("Interface\\Buttons\\UI-GroupLoot-Pass-Highlight", "ADD")
+		avoid:SetScript("OnClick", function()
+			if row.item and not row.gatherRow then
+				SP:ToggleAvoid(row.item)
+				SP:Refresh()
+			end
+		end)
+		avoid:SetScript("OnEnter", function(self)
+			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+			if row.item and SkillPathDB.avoid[row.item] then
+				GameTooltip:SetText(L["Use this material again"])
+			else
+				GameTooltip:SetText(L["Avoid this material"])
+				GameTooltip:AddLine(L["The route is recalculated without it where possible."], 1, 1, 1, true)
+			end
+			GameTooltip:Show()
+		end)
+		avoid:SetScript("OnLeave", function()
+			GameTooltip:Hide()
+		end)
+		row.avoidButton = avoid
+		row.right:ClearAllPoints()
+		row.right:SetPoint("RIGHT", avoid, "LEFT", -4, 0)
 		matRows[i] = row
 	end
+
+	hintLabel = Label(frame, "", "GameFontDisableSmall")
+	hintLabel:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 22, 16)
 
 	priceLabel = Label(frame, "", "GameFontDisableSmall")
 	priceLabel:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -20, 16)
