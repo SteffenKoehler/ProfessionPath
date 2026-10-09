@@ -36,6 +36,7 @@ local translations = {
 		["avoided"] = "gemieden",
 		["Prices: %s"] = "Preise: %s",
 		["estimate from vendor prices"] = "Schätzung aus Händlerpreisen",
+		["Please restart the game client completely to load all SkillPath files."] = "Bitte den Spielclient komplett neu starten, damit alle SkillPath-Dateien geladen werden.",
 		["Zone level %d"] = "Gebietsstufe %d",
 		["Zone level %d - above your level"] = "Gebietsstufe %d - über deiner Stufe",
 		["from skill %d, ~%d spawns"] = "ab Skill %d, ~%d Vorkommen",

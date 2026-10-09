@@ -237,7 +237,17 @@ local function Build()
 		status:SetText(format("%s  |cff808080%s|r", name, L["Not learned"]))
 	end
 
-	gathering = Gather.IsGather(selected)
+	-- Gather.lua is missing when the client still has an old SkillPath.toc loaded (the
+	-- client only reads .toc files when it starts)
+	if not Gather then
+		gathering = false
+		if selected == 182 or selected == 393 or selected == 356 then
+			entries[#entries + 1] = {note = L["Please restart the game client completely to load all SkillPath files."], color = "ff4040"}
+			return
+		end
+	else
+		gathering = Gather.IsGather(selected)
+	end
 	if gathering then
 		BuildGather(maxRank)
 		return
