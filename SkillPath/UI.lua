@@ -7,7 +7,7 @@ local Planner = SP.Planner
 local Data = SkillPathData
 local F = Planner.FIELDS
 
-local WIDTH, HEIGHT = 440, 520
+local WIDTH, HEIGHT = 440, 540
 local ROW_HEIGHT = 18
 local ROUTE_ROWS, MAT_ROWS = 13, 7
 local COLORS = {orange = "ff8040", yellow = "ffff00", green = "40bf40", grey = "808080"}
@@ -15,6 +15,8 @@ local COLORS = {orange = "ff8040", yellow = "ffff00", green = "40bf40", grey = "
 local frame, routeScroll, matScroll, dropdown, status, vendorCheck
 local routeRows, matRows = {}, {}
 local entries, materials = {}, {}
+local materialTotal = 0
+local matLabel, priceLabel
 local selected, rank = nil, 0
 local dirty, sinceRefresh, retries = true, 0, 0
 
@@ -101,6 +103,25 @@ local function ShowItemTooltip(row)
 	end
 end
 
+local PRICE_SOURCE = {vendor = "Vendor", auction = "Auction", estimate = "Estimate"}
+
+local function ShowMaterialTooltip(row)
+	if not row.item then
+		return
+	end
+	ShowItemTooltip(row)
+	GameTooltip:AddLine(" ")
+	if SkillPathDB.avoid[row.item] then
+		GameTooltip:AddLine(L["Avoided: the route only uses it if there is no alternative."], 1, 0.4, 0.4, true)
+		GameTooltip:AddLine(L["Right-click: use again"], 0.6, 0.8, 1)
+	else
+		local price, source = SP:Price(row.item)
+		GameTooltip:AddLine(format(L["Price per unit: %s (%s)"], GetCoinTextureString(math.floor(price)), L[PRICE_SOURCE[source] or source]), 1, 1, 1)
+		GameTooltip:AddLine(L["Right-click: avoid this material"], 0.6, 0.8, 1)
+	end
+	GameTooltip:Show()
+end
+
 -- Data ------------------------------------------------------------------------------------
 
 local function Build()
@@ -152,14 +173,33 @@ local function Build()
 		end
 	end
 
+	local total = 0
 	for item, count in pairs(Planner.Materials(steps, rank)) do
 		if count > 0 then
-			materials[#materials + 1] = {item = item, need = count, have = GetItemCount(item, true)}
+			local have = GetItemCount(item, true)
+			materials[#materials + 1] = {item = item, need = count, have = have}
+			if not SkillPathDB.avoid[item] and have < count then
+				total = total + (count - have) * SP:Price(item)
+			end
 		end
 	end
 	table.sort(materials, function(a, b)
 		return a.need > b.need
 	end)
+	-- avoided materials the route no longer needs stay listed, so they can be used again
+	for item in pairs(SkillPathDB.avoid) do
+		local listed
+		for _, m in ipairs(materials) do
+			if m.item == item then
+				listed = true
+				break
+			end
+		end
+		if not listed then
+			materials[#materials + 1] = {item = item, need = 0, have = GetItemCount(item, true)}
+		end
+	end
+	materialTotal = total
 end
 
 local function UpdateRoute()
@@ -224,13 +264,25 @@ local function UpdateMaterials()
 			local name, color = SP:ItemName(m.item)
 			row.item = m.item
 			row.icon:SetTexture(SP:ItemIcon(m.item))
-			row.text:SetText(color and (color.hex .. name .. "|r") or name)
-			local ok = m.have >= m.need
-			row.right:SetText(format("|cff%s%s|r", ok and "40bf40" or "ffffff", format(L["have %d / need %d"], m.have, m.need)))
-			row:SetScript("OnEnter", ShowItemTooltip)
+			if SkillPathDB.avoid[m.item] then
+				row.icon:SetDesaturated(true)
+				row.text:SetText("|cff808080" .. name .. "|r")
+				row.right:SetText(m.need > 0 and format("|cffff6666%s|r  %s", L["avoided"], format(L["have %d / need %d"], m.have, m.need))
+					or format("|cffff6666%s|r", L["avoided"]))
+			else
+				row.icon:SetDesaturated(false)
+				row.text:SetText(color and (color.hex .. name .. "|r") or name)
+				local ok = m.have >= m.need
+				row.right:SetText(format("|cff%s%s|r", ok and "40bf40" or "ffffff", format(L["have %d / need %d"], m.have, m.need)))
+			end
+			row:SetScript("OnEnter", ShowMaterialTooltip)
 		end
 	end
 	FauxScrollFrame_Update(matScroll, #materials, MAT_ROWS, ROW_HEIGHT)
+	local source = SP:PriceSource()
+	matLabel:SetText(format("%s  |cffffffff~%s|r", L["Materials for the rest of the route"],
+		GetCoinTextureString(math.floor(materialTotal / 100) * 100)))
+	priceLabel:SetText(format(L["Prices: %s"], source or L["estimate from vendor prices"]))
 end
 
 function SP:Refresh()
@@ -358,7 +410,7 @@ local function CreateMainFrame()
 		routeRows[i]:SetFrameLevel(routeScroll:GetFrameLevel() + 2)
 	end
 
-	local matLabel = Label(frame, L["Materials for the rest of the route"], "GameFontNormal")
+	matLabel = Label(frame, L["Materials for the rest of the route"], "GameFontNormal")
 	matLabel:SetPoint("TOPLEFT", routeLabel, "BOTTOMLEFT", 0, -(ROUTE_ROWS * ROW_HEIGHT + 16))
 	matScroll = CreateFrame("ScrollFrame", "SkillPathMatScroll", frame, "FauxScrollFrameTemplate")
 	matScroll:SetPoint("TOPLEFT", matLabel, "BOTTOMLEFT", 0, -4)
@@ -368,13 +420,38 @@ local function CreateMainFrame()
 		FauxScrollFrame_OnVerticalScroll(self, offset, ROW_HEIGHT, UpdateMaterials)
 	end)
 	for i = 1, MAT_ROWS do
-		matRows[i] = CreateRow(frame, i, matLabel)
-		matRows[i]:SetFrameLevel(matScroll:GetFrameLevel() + 2)
+		local row = CreateRow(frame, i, matLabel)
+		row:SetFrameLevel(matScroll:GetFrameLevel() + 2)
+		row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+		row:SetScript("OnClick", function(self, button)
+			if not self.item then
+				return
+			end
+			if button == "RightButton" then
+				SP:ToggleAvoid(self.item)
+				SP:Refresh()
+				ShowMaterialTooltip(self)
+			elseif IsModifiedClick("CHATLINK") then
+				local link = select(2, GetItemInfo(self.item))
+				if link then
+					ChatEdit_InsertLink(link)
+				end
+			end
+		end)
+		matRows[i] = row
 	end
+
+	priceLabel = Label(frame, "", "GameFontDisableSmall")
+	priceLabel:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -20, 16)
 
 	frame:SetScript("OnShow", function()
 		vendorCheck:SetChecked(SkillPathDB.options.vendorRecipes)
+		SP:ClearPrices()
 		SP:Refresh()
+		SP:UpdateTradeSkillTab()
+	end)
+	frame:SetScript("OnHide", function()
+		SP:UpdateTradeSkillTab()
 	end)
 	frame:SetScript("OnUpdate", function(_, elapsed)
 		sinceRefresh = sinceRefresh + elapsed
@@ -413,34 +490,73 @@ function SP:Toggle()
 	end
 end
 
--- Button in the profession window
+-- Tab on the right edge of the profession window, like the skill line tabs of the spellbook
+local TAB_ICON = "Interface\\Icons\\INV_Misc_Map_01"
+
+-- Skins like ElvUI replace the window art with a backdrop: then the tab sits right at the
+-- backdrop's edge and gets a plain border instead of the spellbook tab art.
+local function PlaceTradeSkillTab(tab)
+	local skin = TradeSkillFrame.backdrop or (TradeSkillFrame.template and TradeSkillFrame)
+	tab:ClearAllPoints()
+	if skin then
+		tab:SetPoint("TOPLEFT", skin, "TOPRIGHT", 2, -40)
+		tab.background:Hide()
+		tab:GetNormalTexture():SetTexCoord(0.08, 0.92, 0.08, 0.92)
+		if not tab.skinned and tab.SetTemplate then
+			pcall(tab.SetTemplate, tab, "Default")
+			tab.skinned = true
+		end
+	else
+		tab:SetPoint("TOPLEFT", TradeSkillFrame, "TOPRIGHT", -33, -65)
+		tab.background:Show()
+	end
+end
+
+function SP:UpdateTradeSkillTab()
+	local tab = SP.tradeSkillTab
+	if tab then
+		tab:SetChecked(frame and frame:IsShown() and 1 or nil)
+	end
+end
+
 function SP:AttachTradeSkillButton()
-	if SP.tradeSkillButton or not TradeSkillFrame then
+	if SP.tradeSkillTab or not TradeSkillFrame then
 		return
 	end
-	local button = CreateFrame("Button", "SkillPathTradeSkillButton", TradeSkillFrame, "UIPanelButtonTemplate")
-	button:SetWidth(72)
-	button:SetHeight(18)
-	button:SetText("SkillPath")
-	-- next to the close button: present in the Blizzard window and in skins like ElvUI,
-	-- which move the filters and search box around
-	local close = TradeSkillFrameCloseButton
-	if close then
-		button:SetPoint("RIGHT", close, "LEFT", -2, 0)
-	else
-		button:SetPoint("TOPRIGHT", TradeSkillFrame, "TOPRIGHT", -40, -14)
-	end
-	button:SetScript("OnClick", function()
-		local name = GetTradeSkillLine()
-		SP:Show(name and SP.nameToSkill[name])
+	local tab = CreateFrame("CheckButton", "SkillPathTradeSkillTab", TradeSkillFrame)
+	tab:SetWidth(32)
+	tab:SetHeight(32)
+	tab.background = tab:CreateTexture(nil, "BACKGROUND")
+	tab.background:SetTexture("Interface\\SpellBook\\SpellBook-SkillLineTab")
+	tab.background:SetWidth(64)
+	tab.background:SetHeight(64)
+	tab.background:SetPoint("TOPLEFT", -3, 11)
+	tab:SetNormalTexture(TAB_ICON)
+	tab:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+	tab:SetCheckedTexture("Interface\\Buttons\\CheckButtonHilight", "ADD")
+	tab:SetScript("OnClick", function()
+		if frame and frame:IsShown() then
+			frame:Hide()
+		else
+			local name = GetTradeSkillLine()
+			SP:Show(name and SP.nameToSkill[name])
+		end
+		SP:UpdateTradeSkillTab()
 	end)
-	button:SetScript("OnEnter", function(self)
+	tab:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		GameTooltip:SetText(L["Opens SkillPath for this profession."])
+		GameTooltip:SetText("SkillPath")
+		GameTooltip:AddLine(L["Opens SkillPath for this profession."], 1, 1, 1)
 		GameTooltip:Show()
 	end)
-	button:SetScript("OnLeave", function()
+	tab:SetScript("OnLeave", function()
 		GameTooltip:Hide()
 	end)
-	SP.tradeSkillButton = button
+	-- skins are applied when the window is first shown, so place the tab on every show
+	TradeSkillFrame:HookScript("OnShow", function()
+		PlaceTradeSkillTab(tab)
+		SP:UpdateTradeSkillTab()
+	end)
+	PlaceTradeSkillTab(tab)
+	SP.tradeSkillTab = tab
 end

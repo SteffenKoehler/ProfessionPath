@@ -116,7 +116,9 @@ function SP:Plan(line, from)
 	end
 	local char = self:Char()
 	local opts = {
-		vendor = Data.vendor,
+		price = function(item)
+			return self:Price(item)
+		end,
 		cooldown = Data.cooldown,
 		known = char.known,
 		vendorRecipes = SkillPathDB.options.vendorRecipes,
@@ -126,6 +128,74 @@ function SP:Plan(line, from)
 		end,
 	}
 	return Planner.Plan(recipes, math.max(1, from or 1), SP.MAX_SKILL, opts)
+end
+
+-- Prices --------------------------------------------------------------------------------
+-- Vendor reagents cost their vendor price; everything else the auction value from
+-- Auctioneer or Auctionator if installed, otherwise an estimate from the vendor sell price.
+-- Materials the player chose to avoid cost so much that the planner only uses them when
+-- there is no alternative.
+
+local AVOID_PRICE = 10000000 -- 1000 gold per unit
+local PRICE_CACHE_TIME = 120
+local priceCache, priceCacheTime = {}, 0
+
+function SP:PriceSource()
+	if AucAdvanced and AucAdvanced.API and AucAdvanced.API.GetMarketValue then
+		return "Auctioneer"
+	elseif Atr_GetAuctionBuyout then
+		return "Auctionator"
+	end
+end
+
+local function AuctionPrice(item)
+	local link = select(2, GetItemInfo(item))
+	if not link then
+		return nil
+	end
+	local ok, value
+	if AucAdvanced and AucAdvanced.API and AucAdvanced.API.GetMarketValue then
+		ok, value = pcall(AucAdvanced.API.GetMarketValue, link)
+	elseif Atr_GetAuctionBuyout then
+		ok, value = pcall(Atr_GetAuctionBuyout, link)
+	end
+	if ok and type(value) == "number" and value > 0 then
+		return value
+	end
+end
+
+-- Price per unit in copper; second value: "vendor", "auction" or "estimate"
+function SP:Price(item)
+	if SkillPathDB.avoid[item] then
+		return AVOID_PRICE, "avoid"
+	end
+	local now = GetTime()
+	if now - priceCacheTime > PRICE_CACHE_TIME then
+		wipe(priceCache)
+		priceCacheTime = now
+	end
+	local cached = priceCache[item]
+	if cached then
+		return cached[1], cached[2]
+	end
+	local price, source = Data.vendor[item], "vendor"
+	if not price then
+		price, source = AuctionPrice(item), "auction"
+		if not price then
+			price, source = Planner.EstimatePrice(item, Data), "estimate"
+		end
+	end
+	priceCache[item] = {price, source}
+	return price, source
+end
+
+function SP:ClearPrices()
+	wipe(priceCache)
+end
+
+function SP:ToggleAvoid(item)
+	SkillPathDB.avoid[item] = not SkillPathDB.avoid[item] or nil
+	wipe(priceCache)
 end
 
 -- Recipes that are not planned (drops, tokens, quests) but would give points at `skill`
@@ -193,6 +263,7 @@ events:SetScript("OnEvent", function(_, event, arg1)
 			SkillPathDB = SkillPathDB or {}
 			SkillPathDB.chars = SkillPathDB.chars or {}
 			SkillPathDB.options = SkillPathDB.options or {}
+			SkillPathDB.avoid = SkillPathDB.avoid or {}
 			if SkillPathDB.options.vendorRecipes == nil then
 				SkillPathDB.options.vendorRecipes = true
 			end

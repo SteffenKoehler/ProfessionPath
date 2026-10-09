@@ -25,8 +25,8 @@ addon = os.path.join(HERE, "..", "SkillPath")
 for f in ("Data.lua", "Planner.lua"):
     lua.execute(open(os.path.join(addon, f), encoding="utf-8").read())
 run = lua.eval("""function(skill, from, to, race)
-    local opts = {vendor = SkillPathData.vendor, cooldown = SkillPathData.cooldown, known = {},
-        vendorRecipes = true, raceBit = race}
+    local opts = {cooldown = SkillPathData.cooldown, known = {}, vendorRecipes = true, raceBit = race,
+        price = function(item) return SkillPath.Planner.EstimatePrice(item, SkillPathData) end}
     local steps, reached = SkillPath.Planner.Plan(SkillPathData.recipes[skill], from, to, opts)
     local out = {}
     for i, st in ipairs(steps) do

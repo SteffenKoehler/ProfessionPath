@@ -17,14 +17,21 @@ cost, from the recipes you can actually get.
   from vendors (tooltip shows which recipe to buy).
 - Notes where you need to learn the next rank (Journeyman ... Grand Master) and which
   recipes you need when trainers and vendors run out (drops, tokens).
-- Material list for the rest of the route with the amount in your bags and bank.
+- Material list for the rest of the route with the amount in your bags and bank and the
+  estimated cost. Right-click a material to avoid it (e.g. rare drops): the route is
+  recalculated without it where possible.
+- Prices: vendor reagents at their vendor price, everything else at the auction value from
+  **Auctioneer** or **Auctionator** if one of them is installed, otherwise estimated from
+  the vendor sell price. Intermediates (bolts of cloth, bars) cost the cheaper of buying
+  and crafting them.
 - Recipe skill-up chance: orange 100 %, then falling linearly to 0 at grey.
 - Names come from your game client, so the addon works in German, English, French, ...
   without translation tables. The interface itself is in English and German.
 
 ## Usage
 
-- `/skillpath` or `/spath` toggles the window, or click **SkillPath** in the profession window.
+- `/skillpath` or `/spath` toggles the window, or click the map tab on the right edge of
+  the profession window (like the tabs of the spellbook).
 - Open each profession window once, so SkillPath knows the recipes you already have.
 
 ## Installation
@@ -48,7 +55,7 @@ loads the whole addon against a stubbed WoW API.
 ## Roadmap
 
 - Gathering professions and Fishing: where to gather at which skill.
-- Highlight the recommended recipe in the profession window; gold costs from auction data.
+- Highlight the recommended recipe in the profession window.
 - Recipe sources (trainer, vendor, drop) in more detail.
 
 ## License

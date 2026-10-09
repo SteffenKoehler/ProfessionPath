@@ -44,6 +44,7 @@ A_SKILL, A_SPELL, A_RACE, A_CLASS, A_ACQUIRE, A_GREY, A_YELLOW = 1, 2, 3, 4, 9, 
 
 # item_template columns (AzerothCore)
 I_ENTRY, I_CLASS, I_REQ_SKILL, I_REQ_RANK, I_SPELL1, I_SPELL2 = 0, 1, 17, 18, 65, 72
+I_BUY_COUNT, I_BUY_PRICE, I_SELL_PRICE = 9, 10, 11
 ITEM_CLASS_RECIPE = 9
 LEARN_SPELLS = (483, 55884)  # "Learning" spells; the taught recipe is in the next slot
 
@@ -106,7 +107,9 @@ def main():
 
     # recipe items: taught spell -> (item, required skill rank, sold by a vendor)
     recipe_items = {}
+    item_prices = {}  # item -> (buy price per unit, sell price)
     for row in sql_rows("item_template.sql", "item_template"):
+        item_prices[row[I_ENTRY]] = (row[I_BUY_PRICE] // max(1, row[I_BUY_COUNT]), row[I_SELL_PRICE])
         if row[I_CLASS] != ITEM_CLASS_RECIPE or row[I_REQ_SKILL] not in SKILLS:
             continue
         taught = row[I_SPELL2] if row[I_SPELL1] in LEARN_SPELLS else row[I_SPELL1]
@@ -191,6 +194,7 @@ def main():
            "-- trainer/vendor/item data (GPL-2.0). Names are read from the game client at runtime.",
            "-- recipe = {spell, source (1 auto, 2 trainer, 3 other, 4 vendor recipe), learn, yellow, grey,",
            "--           trainer cost, race mask, required ability, created item, amount, reagent, count, ...}",
+           "-- vendor = buy price of vendor reagents, sellPrice = vendor sell price of other reagents",
            "SkillPathData = {",
            "\tskills = {"]
     for skill, spell in sorted(SKILLS.items()):
@@ -210,7 +214,25 @@ def main():
         out.append("\t\t" + " ".join("[%d]=%d," % p for p in pairs[i:i + 8]))
     out.append("\t},")
     id_set("cooldown", cooldown)
-    id_set("vendor", vendor_reagent & used)
+
+    # vendor reagents: item -> buy price per unit (copper)
+    def price_map(name, values):
+        out.append("	%s = {" % name)
+        pairs = sorted(values.items())
+        for i in range(0, len(pairs), 10):
+            out.append("		" + " ".join("[%d]=%d," % p for p in pairs[i:i + 10]))
+        out.append("	},")
+
+    price_map("vendor", {i: max(1, item_prices.get(i, (1, 0))[0]) for i in vendor_reagent & used})
+    # value of the other reagents for estimates without auction data: vendor sell price
+    # (or a quarter of the buy price if it has none)
+    estimate = {}
+    for i in used - vendor_reagent:
+        buy, sell = item_prices.get(i, (0, 0))
+        value = sell or buy // 4
+        if value > 0:
+            estimate[i] = value
+    price_map("sellPrice", estimate)
     out.append("}")
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, "w", encoding="utf-8", newline="\r\n") as f:
@@ -220,8 +242,9 @@ def main():
         s = stats[skill]
         print("skill %3d: auto %3d  trainer %3d  vendor recipe %3d  other %3d"
               % (skill, s[SOURCE_AUTO], s[SOURCE_TRAINER], s[SOURCE_VENDOR], s[SOURCE_OTHER]))
-    print("cooldown:", len(cooldown), " vendor reagents:", len(vendor_reagent & used),
+    print("cooldown:", len(cooldown), " vendor reagents:", len(vendor_reagent & used), " estimates:", len(estimate),
           " size:", os.path.getsize(OUT), "bytes")
 
 
-main()
+if __name__ == "__main__":
+    main()

@@ -12,8 +12,21 @@ Planner.SOURCE_AUTO, Planner.SOURCE_TRAINER, Planner.SOURCE_OTHER, Planner.SOURC
 -- Keep the current recipe while a new one is at most this much cheaper per skill point,
 -- so the route does not jump between recipes for tiny gains.
 local SWITCH_MARGIN = 1.15
-local VENDOR_WEIGHT = 0.25
-local RAW_WEIGHT = 1
+-- Without auction data a material is estimated at this multiple of its vendor sell price
+-- (auction prices are typically a few times the sell price).
+Planner.ESTIMATE_FACTOR = 4
+local UNKNOWN_PRICE = 100 -- 1 silver for items without any price information
+
+-- Price estimate without auction data: vendor buy price for vendor reagents, otherwise a
+-- multiple of the vendor sell price. data = SkillPathData.
+function Planner.EstimatePrice(item, data)
+	local buy = data.vendor[item]
+	if buy then
+		return buy
+	end
+	local sell = data.sellPrice and data.sellPrice[item]
+	return sell and sell * Planner.ESTIMATE_FACTOR or UNKNOWN_PRICE
+end
 
 -- Chance for a skill point at skill s: orange 100 %, then linear down to 0 at grey.
 function Planner.Chance(recipe, s)
@@ -55,8 +68,9 @@ local function MakerIndex(recipes)
 	return makers
 end
 
--- Material cost of one craft. opts.price(item) may return a price (e.g. from auction data);
--- otherwise vendor items weigh VENDOR_WEIGHT, intermediates their own materials, the rest 1.
+-- Material cost of one craft in copper. opts.price(item) gives the price of a material;
+-- intermediates of this profession (bolts of cloth, bars ...) cost the cheaper of their
+-- price and their own materials.
 local function CraftCost(recipe, opts, makers, cache, depth)
 	local cached = cache[recipe]
 	if cached then
@@ -65,15 +79,12 @@ local function CraftCost(recipe, opts, makers, cache, depth)
 	local cost = 0
 	for i = REAGENTS, #recipe, 2 do
 		local item, count = recipe[i], recipe[i + 1]
-		local price = opts.price and opts.price(item)
-		if not price then
-			local maker = makers[item]
-			if opts.vendor[item] then
-				price = VENDOR_WEIGHT
-			elseif maker and maker ~= recipe and depth < 3 then
-				price = CraftCost(maker, opts, makers, cache, depth + 1) / maker[AMOUNT]
-			else
-				price = RAW_WEIGHT
+		local price = opts.price(item)
+		local maker = makers[item]
+		if maker and maker ~= recipe and depth < 3 then
+			local own = CraftCost(maker, opts, makers, cache, depth + 1) / maker[AMOUNT]
+			if own < price then
+				price = own
 			end
 		end
 		cost = cost + price * count
@@ -113,9 +124,9 @@ local function Usable(recipe, s, opts)
 	return false
 end
 
--- Plan from skill `from` to `to`. opts: vendor (set of cheap reagents), cooldown (set of
+-- Plan from skill `from` to `to`. opts: price(item) in copper (required), cooldown (set of
 -- spells to skip), known (set of spells), vendorRecipes (allow recipes bought from vendors),
--- raceBit, hasAbility(spell), price(item). Returns steps {recipe, from, to, crafts} and the end skill
+-- raceBit, hasAbility(spell). Returns steps {recipe, from, to, crafts} and the end skill
 -- (lower than `to` if no usable recipe gives points any more).
 function Planner.Plan(recipes, from, to, opts)
 	local makers = MakerIndex(recipes)

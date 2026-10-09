@@ -67,6 +67,9 @@ FauxScrollFrame_SetOffset = function(f, o) offsets[f] = o end
 FauxScrollFrame_Update = noop
 FauxScrollFrame_OnVerticalScroll = noop
 SlashCmdList = {}
+GetTime = function() return 1000 end
+IsModifiedClick = function() return false end
+ChatEdit_InsertLink = noop
 """
 
 
@@ -75,7 +78,7 @@ def main():
     lua.execute(STUBS)
     for f in ("Locales.lua", "Data.lua", "Planner.lua", "Core.lua", "UI.lua"):
         lua.execute(open(os.path.join(ADDON, f), encoding="utf-8").read())
-    lua.execute("SkillPathDB = {chars = {}, options = {vendorRecipes = true}}")
+    lua.execute("SkillPathDB = {chars = {}, options = {vendorRecipes = true}, avoid = {}}")
     lua.execute(open(os.path.join(HERE, "smoke_body.lua"), encoding="utf-8").read())
     print("smoke test passed")
 
