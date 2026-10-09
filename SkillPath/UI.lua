@@ -116,8 +116,9 @@ local function ShowMaterialTooltip(row)
 	end
 	ShowItemTooltip(row)
 	GameTooltip:AddLine(" ")
-	if SkillPathDB.avoid[row.item] then
+	if SP:IsAvoided(row.item, selected) then
 		GameTooltip:AddLine(L["Avoided: the route only uses it if there is no alternative."], 1, 0.4, 0.4, true)
+		GameTooltip:AddLine(L["Only for this profession."], 0.7, 0.7, 0.7)
 		GameTooltip:AddLine(L["Right-click: use again"], 0.6, 0.8, 1)
 	else
 		local price, source = SP:Price(row.item)
@@ -284,7 +285,7 @@ local function Build()
 		if count > 0 then
 			local have = GetItemCount(item, true)
 			materials[#materials + 1] = {item = item, need = count, have = have}
-			if not SkillPathDB.avoid[item] and have < count then
+			if not SP:IsAvoided(item, selected) and have < count then
 				total = total + (count - have) * SP:Price(item)
 			end
 		end
@@ -302,13 +303,13 @@ local function Build()
 	for _, r in ipairs(Data.recipes[selected] or {}) do
 		if r[F.GREY] > rank then
 			for i = F.REAGENTS, #r, 2 do
-				if SkillPathDB.avoid[r[i]] then
+				if SP:IsAvoided(r[i], selected) then
 					relevant[r[i]] = true
 				end
 			end
 		end
 	end
-	for item in pairs(SkillPathDB.avoid) do
+	for item in pairs(SkillPathDB.avoided[selected] or {}) do
 		if relevant[item] and not listed[item] then
 			materials[#materials + 1] = {item = item, need = 0, have = GetItemCount(item, true)}
 		end
@@ -423,8 +424,8 @@ local function UpdateMaterials()
 			row.item = m.item
 			row.icon:SetTexture(SP:ItemIcon(m.item))
 			row.avoidButton:Show()
-			row.avoidButton.icon:SetTexture(SkillPathDB.avoid[m.item] and USE_AGAIN_ICON or AVOID_ICON)
-			if SkillPathDB.avoid[m.item] then
+			row.avoidButton.icon:SetTexture(SP:IsAvoided(m.item, selected) and USE_AGAIN_ICON or AVOID_ICON)
+			if SP:IsAvoided(m.item, selected) then
 				row.icon:SetDesaturated(true)
 				row.text:SetText("|cff808080" .. name .. "|r")
 				row.right:SetText(m.need > 0 and format("|cffff6666%s|r  %s", L["avoided"], format(L["have %d / need %d"], m.have, m.need))
@@ -664,7 +665,7 @@ local function CreateMainFrame()
 				return
 			end
 			if button == "RightButton" and not self.gatherRow then
-				SP:ToggleAvoid(self.item)
+				SP:ToggleAvoid(self.item, selected)
 				SP:Refresh()
 				ShowMaterialTooltip(self)
 			elseif IsModifiedClick("CHATLINK") then
@@ -687,17 +688,18 @@ local function CreateMainFrame()
 		avoid:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
 		avoid:SetScript("OnClick", function()
 			if row.item and not row.gatherRow then
-				SP:ToggleAvoid(row.item)
+				SP:ToggleAvoid(row.item, selected)
 				SP:Refresh()
 			end
 		end)
 		avoid:SetScript("OnEnter", function(self)
 			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-			if row.item and SkillPathDB.avoid[row.item] then
+			if row.item and SP:IsAvoided(row.item, selected) then
 				GameTooltip:SetText(L["Use this material again"])
 			else
 				GameTooltip:SetText(L["Avoid this material"])
 				GameTooltip:AddLine(L["The route is recalculated without it where possible."], 1, 1, 1, true)
+				GameTooltip:AddLine(L["Only for this profession."], 0.7, 0.7, 0.7)
 			end
 			GameTooltip:Show()
 		end)

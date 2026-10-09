@@ -18,7 +18,7 @@ cost, from the recipes you can actually get.
 - Notes where you need to learn the next rank (Journeyman ... Grand Master) and which
   recipes you need when trainers and vendors run out (drops, tokens).
 - Material list for the rest of the route with the amount in your bags and bank and the
-  estimated cost. Right-click a material to avoid it (e.g. rare drops): the route is
+  estimated cost. Click the X next to a material to avoid it in this profession (e.g. rare drops): the route is
   recalculated without it where possible.
 - Prices: vendor reagents at their vendor price, everything else at the auction value from
   **Auctioneer** or **Auctionator** if one of them is installed, otherwise estimated from

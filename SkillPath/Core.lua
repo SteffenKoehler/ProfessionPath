@@ -125,6 +125,10 @@ function SP:RaceBit()
 	return id and bit.lshift(1, id - 1) or nil
 end
 
+-- Price of a material avoided in this profession: so high that the planner only uses it
+-- when there is no alternative
+local AVOID_PRICE = 10000000 -- 1000 gold per unit
+
 -- Route for a profession from the given skill (default: the player's skill)
 function SP:Plan(line, from)
 	local recipes = Data.recipes[line]
@@ -134,6 +138,9 @@ function SP:Plan(line, from)
 	local char = self:Char()
 	local opts = {
 		price = function(item)
+			if self:IsAvoided(item, line) then
+				return AVOID_PRICE
+			end
 			return self:Price(item)
 		end,
 		cooldown = Data.cooldown,
@@ -150,10 +157,9 @@ end
 -- Prices --------------------------------------------------------------------------------
 -- Vendor reagents cost their vendor price; everything else the auction value from
 -- Auctioneer or Auctionator if installed, otherwise an estimate from the vendor sell price.
--- Materials the player chose to avoid cost so much that the planner only uses them when
--- there is no alternative.
+-- Materials the player chose to avoid in a profession cost so much there that the planner
+-- only uses them when there is no alternative (see SP:Plan).
 
-local AVOID_PRICE = 10000000 -- 1000 gold per unit
 local PRICE_CACHE_TIME = 120
 local priceCache, priceCacheTime = {}, 0
 
@@ -181,11 +187,8 @@ local function AuctionPrice(item)
 	end
 end
 
--- Price per unit in copper; second value: "vendor", "auction" or "estimate"
+-- Market price per unit in copper; second value: "vendor", "auction" or "estimate"
 function SP:Price(item)
-	if SkillPathDB.avoid[item] then
-		return AVOID_PRICE, "avoid"
-	end
 	local now = GetTime()
 	if now - priceCacheTime > PRICE_CACHE_TIME then
 		wipe(priceCache)
@@ -210,9 +213,17 @@ function SP:ClearPrices()
 	wipe(priceCache)
 end
 
-function SP:ToggleAvoid(item)
-	SkillPathDB.avoid[item] = not SkillPathDB.avoid[item] or nil
-	wipe(priceCache)
+-- Avoiding is per profession: a material that is not worth it in one profession can still
+-- be the cheapest way in another.
+function SP:IsAvoided(item, line)
+	local list = SkillPathDB.avoided[line]
+	return list and list[item] or false
+end
+
+function SP:ToggleAvoid(item, line)
+	local list = SkillPathDB.avoided[line] or {}
+	SkillPathDB.avoided[line] = list
+	list[item] = not list[item] or nil
 end
 
 -- Recipes that are not planned (drops, tokens, quests) but would give points at `skill`
@@ -283,7 +294,9 @@ events:SetScript("OnEvent", function(_, event, arg1)
 			SkillPathDB = SkillPathDB or {}
 			SkillPathDB.chars = SkillPathDB.chars or {}
 			SkillPathDB.options = SkillPathDB.options or {}
-			SkillPathDB.avoid = SkillPathDB.avoid or {}
+			-- per profession since 0.4.0; the old account-wide list is dropped once
+			SkillPathDB.avoid = nil
+			SkillPathDB.avoided = SkillPathDB.avoided or {}
 			if SkillPathDB.options.vendorRecipes == nil then
 				SkillPathDB.options.vendorRecipes = true
 			end

@@ -46,6 +46,7 @@ local translations = {
 		["Use this material again"] = "Material wieder verwenden",
 		["The route is recalculated without it where possible."] = "Die Route wird, wo möglich, ohne dieses Material neu berechnet.",
 		["X: avoid a material"] = "X: Material meiden",
+		["Only for this profession."] = "Gilt nur für diesen Beruf.",
 		["Zone level %d"] = "Gebietsstufe %d",
 		["Zone level %d - above your level"] = "Gebietsstufe %d - über deiner Stufe",
 		["from skill %d, ~%d spawns"] = "ab Skill %d, ~%d Vorkommen",

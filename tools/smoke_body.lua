@@ -41,15 +41,16 @@ assert(SP:Price(thread) == SkillPathData.vendor[thread], "vendor price")
 local price, source = SP:Price(14047)
 assert(price > 0 and source == "estimate", "estimate for runecloth")
 local before = SP:Plan(129, 300)
-SP:ToggleAvoid(19441) -- Huge Venom Sac
+SP:ToggleAvoid(19441, 129) -- Huge Venom Sac, in First Aid only
 local after = SP:Plan(129, 300)
 for _, step in ipairs(after) do
 	for i = 11, #step.recipe, 2 do
 		assert(step.recipe[i] ~= 19441, "avoided material still planned")
 	end
 end
-SP:ToggleAvoid(19441)
-assert(not SkillPathDB.avoid[19441], "avoid toggled back")
+assert(not SP:IsAvoided(19441, 185), "avoiding is per profession")
+SP:ToggleAvoid(19441, 129)
+assert(not SP:IsAvoided(19441, 129), "avoid toggled back")
 SP:Refresh()
 print("price checks ok")
 
