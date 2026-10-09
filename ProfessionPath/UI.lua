@@ -695,6 +695,12 @@ local function CreateMainFrame()
 
 	local title = Label(frame, "ProfessionPath", "GameFontNormalLarge")
 	title:SetPoint("TOP", 0, -18)
+	-- version from the .toc, small and grey next to the title
+	local version = GetAddOnMetadata("ProfessionPath", "Version")
+	if version then
+		local versionLabel = Label(frame, "v" .. version, "GameFontDisableSmall")
+		versionLabel:SetPoint("BOTTOMLEFT", title, "BOTTOMRIGHT", 4, 1)
+	end
 	local close = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
 	close:SetPoint("TOPRIGHT", -6, -6)
 
