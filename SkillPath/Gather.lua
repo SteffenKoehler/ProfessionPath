@@ -286,25 +286,30 @@ function G.PointsNow(line, s)
 end
 
 -- Zone names ----------------------------------------------------------------------------
--- Read once from the world map in the client's language (map id -> name); until then or if
--- that is not possible, the German name (German client) or the internal map name.
+-- Read once from the world map in the client's language (map file -> name); until then or
+-- if that is not possible, the German name (German client) or the internal map name.
 
 local mapNames
 
 local function ScanWorldMap()
-	if mapNames or not (GetMapZones and SetMapZoom and GetCurrentMapAreaID) then
+	if mapNames or not (GetMapZones and SetMapZoom and GetMapInfo) then
 		return
 	end
 	if WorldMapFrame and WorldMapFrame:IsShown() then
 		return -- do not move the map the player is looking at; try again later
 	end
+	-- Key: the internal map file name (e.g. "BoreanTundra"), which is also in the data.
+	-- (GetCurrentMapAreaID is off by one against WorldMapArea.dbc on this client.)
 	local names = {}
 	local ok = pcall(function()
 		for continent = 1, 4 do
 			local zones = {GetMapZones(continent)}
 			for index = 1, #zones do
 				SetMapZoom(continent, index)
-				names[GetCurrentMapAreaID()] = zones[index]
+				local file = GetMapInfo()
+				if file then
+					names[file] = zones[index]
+				end
 			end
 		end
 	end)
@@ -324,7 +329,7 @@ function G.ZoneName(area)
 		return "?"
 	end
 	ScanWorldMap()
-	local name = mapNames and mapNames[zone[1]]
+	local name = mapNames and mapNames[zone[6]]
 	if name then
 		return name
 	end

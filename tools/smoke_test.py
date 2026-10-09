@@ -71,6 +71,12 @@ GetTime = function() return 1000 end
 IsModifiedClick = function() return false end
 ChatEdit_InsertLink = noop
 UnitLevel = function() return 32 end
+-- world map: continent 1 has two zones; GetMapInfo returns the map file of the zoomed zone
+local zoomed
+GetMapZones = function(c) if c == 1 then return "Grizzlyhuegel", "Heulender Fjord" end end
+SetMapZoom = function(c, i) zoomed = (c == 1) and ({"GrizzlyHills", "HowlingFjord"})[i] or nil end
+GetMapInfo = function() return zoomed end
+SetMapToCurrentZone = noop
 UnitFactionGroup = function() return "Horde" end
 """
 

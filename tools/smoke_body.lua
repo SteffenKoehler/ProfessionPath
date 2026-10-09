@@ -78,3 +78,7 @@ end
 local fish = SP.Gather.PlanFishing(1, 450, {level = 80, faction = 2})
 assert(#fish == 6 and #fish[1].areas > 0, "fishing bands")
 print("gathering ok")
+
+-- zone names come from the world map by map file name (Howling Fjord = area 495)
+assert(SP.Gather.ZoneName(495) == "Heulender Fjord", "zone name by map file: " .. SP.Gather.ZoneName(495))
+print("zone names ok")
