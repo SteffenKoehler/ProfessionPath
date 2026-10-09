@@ -69,6 +69,37 @@ local function CreateRow(parent, index, anchor)
 	return row
 end
 
+-- How to get a recipe the character does not know yet; nil if it is known or comes with the
+-- profession. Returns text and color.
+local function LearnHint(r)
+	local spell = r[F.SPELL]
+	if r[F.SOURCE] == Planner.SOURCE_AUTO or SP:Char().known[spell] then
+		return nil
+	end
+	if r[F.SOURCE] == Planner.SOURCE_TRAINER then
+		return format(L["Learn at trainer from %d (%s)"], r[F.LEARN], GetCoinTextureString(r[F.COST])), 0.6, 0.8, 1
+	elseif Data.recipeItem[spell] then
+		local name = SP:ItemName(Data.recipeItem[spell])
+		local text = r[F.SOURCE] == Planner.SOURCE_VENDOR and L["Buy recipe: %s"] or L["Recipe needed: %s"]
+		return format(text, name), 1, 0.5, 0.25
+	end
+end
+
+local function ShowBookTooltip(book)
+	local entry = book:GetParent().entry
+	if not (entry and entry.step) then
+		return
+	end
+	GameTooltip:SetOwner(book, "ANCHOR_RIGHT")
+	GameTooltip:SetText(L["Recipe not learned yet"])
+	local text, r, g, b = LearnHint(entry.step.recipe)
+	if text then
+		GameTooltip:AddLine(text, r, g, b, true)
+	end
+	GameTooltip:AddLine(L["The book disappears once you have learned the recipe and opened the profession window."], 0.7, 0.7, 0.7, true)
+	GameTooltip:Show()
+end
+
 local function ShowStepTooltip(row)
 	local entry = row.entry
 	if not entry or not entry.step then
@@ -79,13 +110,9 @@ local function ShowStepTooltip(row)
 	GameTooltip:SetHyperlink("enchant:" .. r[F.SPELL])
 	GameTooltip:AddLine(" ")
 	GameTooltip:AddLine(format(L["Skill %d-%d, about %d crafts"], entry.step.from, entry.step.to, entry.step.crafts), 1, 1, 1)
-	local source = r[F.SOURCE]
-	if source == Planner.SOURCE_TRAINER then
-		GameTooltip:AddLine(format(L["Learn at trainer from %d (%s)"], r[F.LEARN], GetCoinTextureString(r[F.COST])), 0.6, 0.8, 1)
-	elseif Data.recipeItem[r[F.SPELL]] and not SP:Char().known[r[F.SPELL]] then
-		local name = SP:ItemName(Data.recipeItem[r[F.SPELL]])
-		local text = source == Planner.SOURCE_VENDOR and L["Buy recipe: %s"] or L["Recipe needed: %s"]
-		GameTooltip:AddLine(format(text, name), 1, 0.5, 0.25)
+	local text, red, green, blue = LearnHint(r)
+	if text then
+		GameTooltip:AddLine(text, red, green, blue)
 	end
 	GameTooltip:Show()
 end
@@ -346,6 +373,7 @@ local function UpdateRoute()
 		row.entry = entry
 		row.item = nil
 		row.highlight:Hide()
+		row.book:Hide()
 		row:SetScript("OnEnter", nil)
 		if not entry then
 			row:Hide()
@@ -408,6 +436,9 @@ local function UpdateRoute()
 				local color = done and COLORS.grey or COLORS[Planner.Color(r, math.max(rank, step.from))]
 				row.text:SetText(format("|cffaaaaaa%3d-%3d|r  |cff%s%s|r", step.from, step.to, color, name))
 				row.right:SetText(done and "" or format("x%d", crafts))
+				if not done and LearnHint(r) then
+					row.book:Show()
+				end
 				row:SetScript("OnEnter", ShowStepTooltip)
 			end
 		end
@@ -675,8 +706,24 @@ local function CreateMainFrame()
 		FauxScrollFrame_OnVerticalScroll(self, offset, ROW_HEIGHT, UpdateRoute)
 	end)
 	for i = 1, ROUTE_ROWS do
-		routeRows[i] = CreateRow(frame, i, routeLabel)
-		routeRows[i]:SetFrameLevel(routeScroll:GetFrameLevel() + 2)
+		local row = CreateRow(frame, i, routeLabel)
+		row:SetFrameLevel(routeScroll:GetFrameLevel() + 2)
+		-- book: the recipe still has to be learned (tooltip says where)
+		local book = CreateFrame("Button", nil, row)
+		book:SetWidth(14)
+		book:SetHeight(14)
+		book:SetPoint("RIGHT", row.right, "LEFT", -4, 0)
+		book:SetFrameLevel(row:GetFrameLevel() + 1)
+		local icon = book:CreateTexture(nil, "ARTWORK")
+		icon:SetAllPoints()
+		icon:SetTexture("Interface\\Icons\\INV_Misc_Book_09")
+		book:SetScript("OnEnter", ShowBookTooltip)
+		book:SetScript("OnLeave", function()
+			GameTooltip:Hide()
+		end)
+		book:Hide()
+		row.book = book
+		routeRows[i] = row
 	end
 
 	matLabel = Label(frame, L["Materials for the rest of the route"], "GameFontNormal")

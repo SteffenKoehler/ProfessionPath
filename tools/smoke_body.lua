@@ -95,3 +95,9 @@ SP:Refresh()
 SkillPathDB.avoided[129] = nil
 SP:Refresh()
 print("still needed ok")
+
+-- book check: route rows with unknown recipes refresh without errors
+SP:Char().known = {}
+SP:Show(185)
+SP:Refresh()
+print("book ok")
