@@ -12,6 +12,10 @@ Planner.SOURCE_AUTO, Planner.SOURCE_TRAINER, Planner.SOURCE_OTHER, Planner.SOURC
 -- Keep the current recipe while a new one is at most this much cheaper per skill point,
 -- so the route does not jump between recipes for tiny gains.
 local SWITCH_MARGIN = 1.15
+-- Every craft also costs effort (crafting time, getting the materials), counted as this many
+-- copper. At low skill, where materials cost next to nothing, this prefers recipes that need
+-- few crafts over a cheap green recipe that needs hundreds; at high skill gold decides.
+Planner.CRAFT_EFFORT = 300
 -- Without auction data a material is estimated at this multiple of its vendor sell price
 -- (auction prices are typically a few times the sell price).
 Planner.ESTIMATE_FACTOR = 4
@@ -140,7 +144,7 @@ function Planner.Plan(recipes, from, to, opts)
 		for _, r in ipairs(recipes) do
 			local p = Planner.Chance(r, s)
 			if p > 0 and Usable(r, s, opts) then
-				local score = CraftCost(r, opts, makers, cache, 0) / p
+				local score = (CraftCost(r, opts, makers, cache, 0) + Planner.CRAFT_EFFORT) / p
 				if not bestScore or score < bestScore then
 					best, bestScore = r, score
 				end
@@ -151,7 +155,8 @@ function Planner.Plan(recipes, from, to, opts)
 		end
 		if current and current ~= best then
 			local p = Planner.Chance(current, s)
-			if p > 0 and Usable(current, s, opts) and CraftCost(current, opts, makers, cache, 0) / p <= bestScore * SWITCH_MARGIN then
+			if p > 0 and Usable(current, s, opts)
+				and (CraftCost(current, opts, makers, cache, 0) + Planner.CRAFT_EFFORT) / p <= bestScore * SWITCH_MARGIN then
 				best = current
 			end
 		end
