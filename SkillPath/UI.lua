@@ -942,11 +942,28 @@ local function CreateTab(name, icon, checkable)
 	return tab
 end
 
--- Recommendation for the open profession window: the current route step, cached until the
--- skill, the known recipes or the options change (TradeSkillFrame_Update runs on every scroll)
+-- Recommendation for the open profession window. The window can only show recipes the
+-- character knows: if the recipe of the current route step is not learned yet, the best
+-- known recipe that still gives points is recommended instead, and the planned one is named
+-- in the tooltips. Cached until the skill, the known recipes or the options change
+-- (TradeSkillFrame_Update runs on every scroll).
 local recommendCache, recommendKey
 SP.recommendVersion = 0
 
+local function StepAt(steps, skill)
+	for _, step in ipairs(steps) do
+		if skill >= step.from and skill < step.to then
+			return step
+		end
+	end
+end
+
+local function Remaining(step, skill)
+	return math.ceil(step.crafts * (step.to - skill) / (step.to - step.from))
+end
+
+-- Returns {planned = route recipe, spell/recipe/crafts/to = what to craft now (nil if no
+-- known recipe gives points), substitute = true if that is not the planned recipe}
 function SP:Recommended()
 	local name, skill = GetTradeSkillLine()
 	local line = name and SP.nameToSkill[name]
@@ -956,16 +973,38 @@ function SP:Recommended()
 	local key = line .. ":" .. skill .. ":" .. SP.recommendVersion .. ":" .. tostring(SkillPathDB.options.vendorRecipes)
 	if key ~= recommendKey then
 		recommendKey, recommendCache = key, false
-		local steps = SP:Plan(line, skill)
-		for _, step in ipairs(steps) do
-			if skill >= step.from and skill < step.to then
-				local crafts = math.ceil(step.crafts * (step.to - skill) / (step.to - step.from))
-				recommendCache = {spell = step.recipe[F.SPELL], recipe = step.recipe, crafts = crafts, to = step.to}
-				break
+		local route = StepAt(SP:Plan(line, skill), skill)
+		if route then
+			local planned = route.recipe
+			local rec = {planned = planned}
+			if not LearnHint(planned) then
+				rec.spell, rec.recipe, rec.crafts, rec.to = planned[F.SPELL], planned, Remaining(route, skill), route.to
+			else
+				local alt = StepAt(SP:Plan(line, skill, true, route.to), skill)
+				if alt then
+					rec.spell, rec.recipe = alt.recipe[F.SPELL], alt.recipe
+					rec.crafts, rec.to, rec.substitute = Remaining(alt, skill), alt.to, true
+				end
 			end
+			recommendCache = rec
 		end
 	end
 	return recommendCache or nil
+end
+
+-- Tooltip lines about the planned recipe when it is not learned yet
+local function AddPlannedLines(rec)
+	if rec.spell and not rec.substitute then
+		return
+	end
+	local hint = LearnHint(rec.planned)
+	GameTooltip:AddLine(format(L["The route plans %s - not learned yet."], SP:RecipeName(rec.planned[F.SPELL])), 1, 0.5, 0.25, true)
+	if hint then
+		GameTooltip:AddLine(hint, 0.6, 0.8, 1, true)
+	end
+	if rec.substitute then
+		GameTooltip:AddLine(L["Until then this is your best known recipe."], 0.7, 0.7, 0.7, true)
+	end
 end
 
 local function RecipeSpell(index)
@@ -975,12 +1014,13 @@ end
 
 local function ShowMarkTooltip(mark)
 	local rec = SP:Recommended()
-	if not rec then
+	if not (rec and rec.spell) then
 		return
 	end
 	GameTooltip:SetOwner(mark, "ANCHOR_RIGHT")
 	GameTooltip:SetText(L["Recommended by SkillPath"])
 	GameTooltip:AddLine(format(L["About %d more crafts up to skill %d."], rec.crafts, rec.to), 1, 1, 1)
+	AddPlannedLines(rec)
 	GameTooltip:Show()
 end
 
@@ -1007,7 +1047,7 @@ local function UpdateTradeSkillMarks()
 				button.skillPathMark = mark
 			end
 			local index = button:IsShown() and button:GetID()
-			if rec and index and index > 0 and RecipeSpell(index) == rec.spell then
+			if rec and rec.spell and index and index > 0 and RecipeSpell(index) == rec.spell then
 				mark:Show()
 			else
 				mark:Hide()
@@ -1027,46 +1067,48 @@ local function FindRecipe(spell)
 	end
 end
 
+local function ResetTradeSkillFilters()
+	if TradeSkillFrameEditBox then
+		TradeSkillFrameEditBox:SetText("")
+	end
+	if SetTradeSkillItemNameFilter then
+		SetTradeSkillItemNameFilter(nil)
+	end
+	if TradeSkillOnlyShowMakeable then
+		TradeSkillOnlyShowMakeable(false)
+		if TradeSkillFrameAvailableFilterCheckButton then
+			TradeSkillFrameAvailableFilterCheckButton:SetChecked(false)
+		end
+	end
+	if SetTradeSkillSubClassFilter then
+		SetTradeSkillSubClassFilter(0, 1, 1)
+	end
+	if SetTradeSkillInvSlotFilter then
+		SetTradeSkillInvSlotFilter(0, 1, 1)
+	end
+	ExpandTradeSkillSubClass(0)
+end
+
 local function SelectRecommended()
 	local rec = SP:Recommended()
 	if not rec then
 		UIErrorsFrame:AddMessage(L["SkillPath has no recommendation for this profession at your skill."], 1, 0.82, 0)
 		return
 	end
+	if not rec.spell then
+		-- no known recipe gives points: say what to learn
+		local hint = LearnHint(rec.planned)
+		UIErrorsFrame:AddMessage(format(L["%s is not learned yet."], SP:RecipeName(rec.planned[F.SPELL]))
+			.. (hint and (" " .. hint) or ""), 1, 0.82, 0)
+		return
+	end
 	local index = FindRecipe(rec.spell)
 	if not index then
-		if TradeSkillFrameEditBox then
-			TradeSkillFrameEditBox:SetText("")
-		end
-		if SetTradeSkillItemNameFilter then
-			SetTradeSkillItemNameFilter(nil)
-		end
-		if TradeSkillOnlyShowMakeable then
-			TradeSkillOnlyShowMakeable(false)
-			if TradeSkillFrameAvailableFilterCheckButton then
-				TradeSkillFrameAvailableFilterCheckButton:SetChecked(false)
-			end
-		end
-		if SetTradeSkillSubClassFilter then
-			SetTradeSkillSubClassFilter(0, 1, 1)
-		end
-		if SetTradeSkillInvSlotFilter then
-			SetTradeSkillInvSlotFilter(0, 1, 1)
-		end
-		ExpandTradeSkillSubClass(0)
+		ResetTradeSkillFilters()
 		index = FindRecipe(rec.spell)
 	end
 	if not index then
-		-- not learned yet: say where to get it
-		local name = SP:RecipeName(rec.spell)
-		local r = rec.recipe
-		local hint
-		if r[F.SOURCE] == Planner.SOURCE_TRAINER then
-			hint = format(L["Learn at trainer from %d (%s)"], r[F.LEARN], GetCoinTextureString(r[F.COST]))
-		elseif Data.recipeItem[rec.spell] then
-			hint = format(L["Buy recipe: %s"], SP:ItemName(Data.recipeItem[rec.spell]))
-		end
-		UIErrorsFrame:AddMessage(format(L["%s is not learned yet."], name) .. (hint and (" " .. hint) or ""), 1, 0.82, 0)
+		UIErrorsFrame:AddMessage(format(L["%s is not learned yet."], SP:RecipeName(rec.spell)), 1, 0.82, 0)
 		return
 	end
 	TradeSkillFrame_SetSelection(index)
@@ -1107,8 +1149,11 @@ function SP:AttachTradeSkillButton()
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 		GameTooltip:SetText(L["Select recommended recipe"])
 		local rec = SP:Recommended()
-		if rec then
+		if rec and rec.spell then
 			GameTooltip:AddLine(format("%s: %s", SP:RecipeName(rec.spell), format(L["about %d crafts"], rec.crafts)), 1, 1, 1)
+		end
+		if rec then
+			AddPlannedLines(rec)
 		end
 		GameTooltip:AddLine(L["Selects the recipe SkillPath recommends at your skill and enters the number of crafts."], 0.7, 0.7, 0.7, true)
 		GameTooltip:Show()

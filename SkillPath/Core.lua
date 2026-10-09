@@ -129,8 +129,9 @@ end
 -- when there is no alternative
 local AVOID_PRICE = 10000000 -- 1000 gold per unit
 
--- Route for a profession from the given skill (default: the player's skill)
-function SP:Plan(line, from)
+-- Route for a profession from the given skill (default: the player's skill) up to `to`
+-- (default 450). onlyKnown: only recipes the character knows already.
+function SP:Plan(line, from, onlyKnown, to)
 	local recipes = Data.recipes[line]
 	if not recipes then
 		return {}, from or 1
@@ -150,8 +151,9 @@ function SP:Plan(line, from)
 		hasAbility = function(spell)
 			return IsSpellKnown and IsSpellKnown(spell) or false
 		end,
+		onlyKnown = onlyKnown,
 	}
-	return Planner.Plan(recipes, math.max(1, from or 1), SP.MAX_SKILL, opts)
+	return Planner.Plan(recipes, math.max(1, from or 1), to or SP.MAX_SKILL, opts)
 end
 
 -- Prices --------------------------------------------------------------------------------

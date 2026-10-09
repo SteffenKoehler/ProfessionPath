@@ -111,6 +111,10 @@ local function Usable(recipe, s, opts)
 		return true
 	end
 	local source = recipe[SOURCE]
+	-- only what the character can craft right now (for the profession window)
+	if opts.onlyKnown then
+		return source == Planner.SOURCE_AUTO
+	end
 	if source == Planner.SOURCE_AUTO then
 		return true
 	elseif source == Planner.SOURCE_VENDOR then
