@@ -49,7 +49,7 @@ print("price checks ok")
 
 -- regression: cheap Small Venom Sacs must not lead to ~245 green Anti-Venom crafts at 132
 do
-	local prices = {[1475] = 5, [2592] = 100}
+	local prices = {[1475] = 5, [2592] = 3000}  -- like the user's auction house: sacs free, wool expensive
 	local opts = {cooldown = SkillPathData.cooldown, known = {}, vendorRecipes = true, raceBit = 1,
 		price = function(item) return prices[item] or SkillPath.Planner.EstimatePrice(item, SkillPathData) end}
 	local steps = SkillPath.Planner.Plan(SkillPathData.recipes[129], 132, 150, opts)

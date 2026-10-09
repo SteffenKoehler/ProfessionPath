@@ -16,6 +16,10 @@ local SWITCH_MARGIN = 1.15
 -- copper. At low skill, where materials cost next to nothing, this prefers recipes that need
 -- few crafts over a cheap green recipe that needs hundreds; at high skill gold decides.
 Planner.CRAFT_EFFORT = 300
+-- Recipes with a lower skill-up chance (green, close to grey) are only planned when no
+-- other recipe gives points: they need many crafts and lots of material that the auction
+-- house may not even have in stock, whatever its market value says.
+Planner.MIN_CHANCE = 0.35
 -- Without auction data a material is estimated at this multiple of its vendor sell price
 -- (auction prices are typically a few times the sell price).
 Planner.ESTIMATE_FACTOR = 4
@@ -140,14 +144,21 @@ function Planner.Plan(recipes, from, to, opts)
 	local s = from
 	local expected = 0
 	while s < to do
+		-- recipes close to grey only if nothing better gives points
 		local best, bestScore
-		for _, r in ipairs(recipes) do
-			local p = Planner.Chance(r, s)
-			if p > 0 and Usable(r, s, opts) then
-				local score = (CraftCost(r, opts, makers, cache, 0) + Planner.CRAFT_EFFORT) / p
-				if not bestScore or score < bestScore then
-					best, bestScore = r, score
+		for pass = 1, 2 do
+			local minChance = pass == 1 and Planner.MIN_CHANCE or 0
+			for _, r in ipairs(recipes) do
+				local p = Planner.Chance(r, s)
+				if p > 0 and p >= minChance and Usable(r, s, opts) then
+					local score = (CraftCost(r, opts, makers, cache, 0) + Planner.CRAFT_EFFORT) / p
+					if not bestScore or score < bestScore then
+						best, bestScore = r, score
+					end
 				end
+			end
+			if best then
+				break
 			end
 		end
 		if not best then
@@ -155,7 +166,7 @@ function Planner.Plan(recipes, from, to, opts)
 		end
 		if current and current ~= best then
 			local p = Planner.Chance(current, s)
-			if p > 0 and Usable(current, s, opts)
+			if p >= math.min(Planner.MIN_CHANCE, Planner.Chance(best, s)) and p > 0 and Usable(current, s, opts)
 				and (CraftCost(current, opts, makers, cache, 0) + Planner.CRAFT_EFFORT) / p <= bestScore * SWITCH_MARGIN then
 				best = current
 			end
