@@ -549,6 +549,7 @@ local function UpdateMaterials()
 end
 
 function SP:Refresh()
+	SP.recommendVersion = (SP.recommendVersion or 0) + 1
 	if not frame or not frame:IsShown() then
 		dirty = true
 		return
@@ -568,6 +569,7 @@ function SP:Refresh()
 end
 
 function SP:OnDataChanged(line)
+	SP.recommendVersion = (SP.recommendVersion or 0) + 1
 	dirty = true
 	if line and frame and frame:IsShown() and SP.followTradeSkill then
 		selected = line
@@ -875,17 +877,18 @@ function SP:Toggle()
 	end
 end
 
--- Tab on the right edge of the profession window, like the skill line tabs of the spellbook
--- scroll with quill: a written guide
-local TAB_ICON = "Interface\\Icons\\INV_Scroll_06"
+-- Profession window --------------------------------------------------------------------
+-- Tabs on the right edge (like the skill line tabs of the spellbook): SkillPath itself and
+-- "select the recommended recipe". The recommended recipe is also marked in the list.
 
--- Skins like ElvUI replace the window art with a backdrop: then the tab sits right at the
--- backdrop's edge and gets a plain border instead of the spellbook tab art.
-local function PlaceTradeSkillTab(tab)
-	local skin = TradeSkillFrame.backdrop or (TradeSkillFrame.template and TradeSkillFrame)
-	tab:ClearAllPoints()
-	if skin then
-		tab:SetPoint("TOPLEFT", skin, "TOPRIGHT", 2, -40)
+local TAB_ICON = "Interface\\Icons\\INV_Scroll_06" -- scroll with quill: a written guide
+local SELECT_ICON = "Interface\\Icons\\Ability_Hunter_SniperShot" -- crosshair: pick the recipe
+local MARK_ICON = "Interface\\Icons\\INV_Scroll_06"
+
+-- Skins like ElvUI replace the window art with a backdrop: then the tabs sit right at the
+-- backdrop's edge and get a plain border instead of the spellbook tab art.
+local function StyleTab(tab, skinned)
+	if skinned then
 		tab.background:Hide()
 		tab:GetNormalTexture():SetTexCoord(0.08, 0.92, 0.08, 0.92)
 		if not tab.skinned and tab.SetTemplate then
@@ -893,9 +896,23 @@ local function PlaceTradeSkillTab(tab)
 			tab.skinned = true
 		end
 	else
-		tab:SetPoint("TOPLEFT", TradeSkillFrame, "TOPRIGHT", -33, -65)
 		tab.background:Show()
 	end
+end
+
+local function PlaceTradeSkillTabs()
+	local tab, selectTab = SP.tradeSkillTab, SP.selectTab
+	local skin = TradeSkillFrame.backdrop or (TradeSkillFrame.template and TradeSkillFrame)
+	tab:ClearAllPoints()
+	if skin then
+		tab:SetPoint("TOPLEFT", skin, "TOPRIGHT", 2, -40)
+	else
+		tab:SetPoint("TOPLEFT", TradeSkillFrame, "TOPRIGHT", -33, -65)
+	end
+	selectTab:ClearAllPoints()
+	selectTab:SetPoint("TOPLEFT", tab, "BOTTOMLEFT", 0, skin and -6 or -17)
+	StyleTab(tab, skin)
+	StyleTab(selectTab, skin)
 end
 
 function SP:UpdateTradeSkillTab()
@@ -905,11 +922,8 @@ function SP:UpdateTradeSkillTab()
 	end
 end
 
-function SP:AttachTradeSkillButton()
-	if SP.tradeSkillTab or not TradeSkillFrame then
-		return
-	end
-	local tab = CreateFrame("CheckButton", "SkillPathTradeSkillTab", TradeSkillFrame)
+local function CreateTab(name, icon, checkable)
+	local tab = CreateFrame(checkable and "CheckButton" or "Button", name, TradeSkillFrame)
 	tab:SetWidth(32)
 	tab:SetHeight(32)
 	tab.background = tab:CreateTexture(nil, "BACKGROUND")
@@ -917,9 +931,159 @@ function SP:AttachTradeSkillButton()
 	tab.background:SetWidth(64)
 	tab.background:SetHeight(64)
 	tab.background:SetPoint("TOPLEFT", -3, 11)
-	tab:SetNormalTexture(TAB_ICON)
+	tab:SetNormalTexture(icon)
 	tab:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
-	tab:SetCheckedTexture("Interface\\Buttons\\CheckButtonHilight", "ADD")
+	if checkable then
+		tab:SetCheckedTexture("Interface\\Buttons\\CheckButtonHilight", "ADD")
+	end
+	tab:SetScript("OnLeave", function()
+		GameTooltip:Hide()
+	end)
+	return tab
+end
+
+-- Recommendation for the open profession window: the current route step, cached until the
+-- skill, the known recipes or the options change (TradeSkillFrame_Update runs on every scroll)
+local recommendCache, recommendKey
+SP.recommendVersion = 0
+
+function SP:Recommended()
+	local name, skill = GetTradeSkillLine()
+	local line = name and SP.nameToSkill[name]
+	if not line or (SP.Gather and SP.Gather.IsGather(line)) or not skill or skill <= 0 then
+		return nil
+	end
+	local key = line .. ":" .. skill .. ":" .. SP.recommendVersion .. ":" .. tostring(SkillPathDB.options.vendorRecipes)
+	if key ~= recommendKey then
+		recommendKey, recommendCache = key, false
+		local steps = SP:Plan(line, skill)
+		for _, step in ipairs(steps) do
+			if skill >= step.from and skill < step.to then
+				local crafts = math.ceil(step.crafts * (step.to - skill) / (step.to - step.from))
+				recommendCache = {spell = step.recipe[F.SPELL], recipe = step.recipe, crafts = crafts, to = step.to}
+				break
+			end
+		end
+	end
+	return recommendCache or nil
+end
+
+local function RecipeSpell(index)
+	local link = GetTradeSkillRecipeLink(index)
+	return link and tonumber(link:match("enchant:(%d+)"))
+end
+
+local function ShowMarkTooltip(mark)
+	local rec = SP:Recommended()
+	if not rec then
+		return
+	end
+	GameTooltip:SetOwner(mark, "ANCHOR_RIGHT")
+	GameTooltip:SetText(L["Recommended by SkillPath"])
+	GameTooltip:AddLine(format(L["About %d more crafts up to skill %d."], rec.crafts, rec.to), 1, 1, 1)
+	GameTooltip:Show()
+end
+
+-- Marks the recommended recipe in the visible rows of the profession window
+local function UpdateTradeSkillMarks()
+	local rec = SP:Recommended()
+	for i = 1, TRADE_SKILLS_DISPLAYED or 8 do
+		local button = _G["TradeSkillSkill" .. i]
+		if button then
+			local mark = button.skillPathMark
+			if not mark then
+				mark = CreateFrame("Button", nil, button)
+				mark:SetWidth(14)
+				mark:SetHeight(14)
+				mark:SetPoint("RIGHT", button, "RIGHT", -2, 0)
+				mark:SetFrameLevel(button:GetFrameLevel() + 2)
+				local icon = mark:CreateTexture(nil, "OVERLAY")
+				icon:SetAllPoints()
+				icon:SetTexture(MARK_ICON)
+				mark:SetScript("OnEnter", ShowMarkTooltip)
+				mark:SetScript("OnLeave", function()
+					GameTooltip:Hide()
+				end)
+				button.skillPathMark = mark
+			end
+			local index = button:IsShown() and button:GetID()
+			if rec and index and index > 0 and RecipeSpell(index) == rec.spell then
+				mark:Show()
+			else
+				mark:Hide()
+			end
+		end
+	end
+end
+
+-- Selects the recommended recipe, scrolls to it and enters the number of crafts. Filters
+-- and the search box may hide it; then they are reset.
+local function FindRecipe(spell)
+	for index = 1, GetNumTradeSkills() do
+		local _, kind = GetTradeSkillInfo(index)
+		if kind ~= "header" and RecipeSpell(index) == spell then
+			return index
+		end
+	end
+end
+
+local function SelectRecommended()
+	local rec = SP:Recommended()
+	if not rec then
+		UIErrorsFrame:AddMessage(L["SkillPath has no recommendation for this profession at your skill."], 1, 0.82, 0)
+		return
+	end
+	local index = FindRecipe(rec.spell)
+	if not index then
+		if TradeSkillFrameEditBox then
+			TradeSkillFrameEditBox:SetText("")
+		end
+		if SetTradeSkillItemNameFilter then
+			SetTradeSkillItemNameFilter(nil)
+		end
+		if TradeSkillOnlyShowMakeable then
+			TradeSkillOnlyShowMakeable(false)
+			if TradeSkillFrameAvailableFilterCheckButton then
+				TradeSkillFrameAvailableFilterCheckButton:SetChecked(false)
+			end
+		end
+		if SetTradeSkillSubClassFilter then
+			SetTradeSkillSubClassFilter(0, 1, 1)
+		end
+		if SetTradeSkillInvSlotFilter then
+			SetTradeSkillInvSlotFilter(0, 1, 1)
+		end
+		ExpandTradeSkillSubClass(0)
+		index = FindRecipe(rec.spell)
+	end
+	if not index then
+		-- not learned yet: say where to get it
+		local name = SP:RecipeName(rec.spell)
+		local r = rec.recipe
+		local hint
+		if r[F.SOURCE] == Planner.SOURCE_TRAINER then
+			hint = format(L["Learn at trainer from %d (%s)"], r[F.LEARN], GetCoinTextureString(r[F.COST]))
+		elseif Data.recipeItem[rec.spell] then
+			hint = format(L["Buy recipe: %s"], SP:ItemName(Data.recipeItem[rec.spell]))
+		end
+		UIErrorsFrame:AddMessage(format(L["%s is not learned yet."], name) .. (hint and (" " .. hint) or ""), 1, 0.82, 0)
+		return
+	end
+	TradeSkillFrame_SetSelection(index)
+	local offset = math.max(0, index - 1)
+	FauxScrollFrame_SetOffset(TradeSkillListScrollFrame, offset)
+	TradeSkillListScrollFrameScrollBar:SetValue(offset * (TRADE_SKILL_HEIGHT or 16))
+	TradeSkillFrame_Update()
+	if TradeSkillInputBox then
+		TradeSkillInputBox:SetNumber(math.max(1, rec.crafts))
+	end
+end
+
+function SP:AttachTradeSkillButton()
+	if SP.tradeSkillTab or not TradeSkillFrame then
+		return
+	end
+	local tab = CreateTab("SkillPathTradeSkillTab", TAB_ICON, true)
 	tab:SetScript("OnClick", function()
 		if frame and frame:IsShown() then
 			frame:Hide()
@@ -935,14 +1099,27 @@ function SP:AttachTradeSkillButton()
 		GameTooltip:AddLine(L["Opens SkillPath for this profession."], 1, 1, 1)
 		GameTooltip:Show()
 	end)
-	tab:SetScript("OnLeave", function()
-		GameTooltip:Hide()
+	SP.tradeSkillTab = tab
+
+	local selectTab = CreateTab("SkillPathSelectTab", SELECT_ICON, false)
+	selectTab:SetScript("OnClick", SelectRecommended)
+	selectTab:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		GameTooltip:SetText(L["Select recommended recipe"])
+		local rec = SP:Recommended()
+		if rec then
+			GameTooltip:AddLine(format("%s: %s", SP:RecipeName(rec.spell), format(L["about %d crafts"], rec.crafts)), 1, 1, 1)
+		end
+		GameTooltip:AddLine(L["Selects the recipe SkillPath recommends at your skill and enters the number of crafts."], 0.7, 0.7, 0.7, true)
+		GameTooltip:Show()
 	end)
-	-- skins are applied when the window is first shown, so place the tab on every show
+	SP.selectTab = selectTab
+
+	-- skins are applied when the window is first shown, so place the tabs on every show
 	TradeSkillFrame:HookScript("OnShow", function()
-		PlaceTradeSkillTab(tab)
+		PlaceTradeSkillTabs()
 		SP:UpdateTradeSkillTab()
 	end)
-	PlaceTradeSkillTab(tab)
-	SP.tradeSkillTab = tab
+	PlaceTradeSkillTabs()
+	hooksecurefunc("TradeSkillFrame_Update", UpdateTradeSkillMarks)
 end

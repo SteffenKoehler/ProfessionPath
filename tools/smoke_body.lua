@@ -101,3 +101,24 @@ SP:Char().known = {}
 SP:Show(185)
 SP:Refresh()
 print("book ok")
+
+-- profession window check: tabs, marks in the recipe list, select button
+TradeSkillFrame = CreateFrame("Frame", "TradeSkillFrame")
+TRADE_SKILLS_DISPLAYED = 2
+CreateFrame("Button", "TradeSkillSkill1")
+CreateFrame("Button", "TradeSkillSkill2")
+for _, name in ipairs({"TradeSkillListScrollFrame", "TradeSkillListScrollFrameScrollBar", "TradeSkillInputBox", "UIErrorsFrame"}) do
+	CreateFrame("Frame", name)
+end
+local hooks = {}
+hooksecurefunc = function(name, f) hooks[name] = f end
+TradeSkillFrame_SetSelection = function() end
+TradeSkillFrame_Update = function() end
+ExpandTradeSkillSubClass = function() end
+SP:AttachTradeSkillButton()
+assert(SP.tradeSkillTab and SP.selectTab, "tabs created")
+hooks.TradeSkillFrame_Update()
+local rec = SP:Recommended()
+assert(rec and rec.crafts > 0, "recommendation for tailoring at 120")
+SP.selectTab:GetScript("OnClick")()
+print("profession window ok", rec.spell, rec.crafts)

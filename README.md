@@ -39,6 +39,9 @@ cost, from the recipes you can actually get.
 - `/skillpath` or `/spath` toggles the window, or click the scroll tab on the right edge of
   the profession window (like the tabs of the spellbook).
 - Open each profession window once, so SkillPath knows the recipes you already have.
+- In the profession window SkillPath marks the recommended recipe at the right edge of its
+  row; the crosshair tab below the SkillPath tab selects it (clearing filters if needed)
+  and enters the number of crafts.
 
 ## Installation
 
@@ -65,7 +68,6 @@ loads the whole addon against a stubbed WoW API.
 
 ## Roadmap
 
-- Highlight the recommended recipe in the profession window.
 - Recipe sources (trainer, vendor, drop) in more detail.
 
 ## License

@@ -24,6 +24,7 @@ local function Object(name)
         if k == "SetFrameLevel" then return function(_, l) level = l end end
         if k == "GetChecked" then return function() return 1 end end
         if k:match("^Create") then return function() return Object() end end
+        if k:match("^%l") then return nil end -- fields like backdrop, skinned
         if k:match("^Get") then return function() return 0 end end
         return noop
     end})

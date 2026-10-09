@@ -224,6 +224,7 @@ function SP:ToggleAvoid(item, line)
 	local list = SkillPathDB.avoided[line] or {}
 	SkillPathDB.avoided[line] = list
 	list[item] = not list[item] or nil
+	SP.recommendVersion = (SP.recommendVersion or 0) + 1
 end
 
 -- Recipes that are not planned (drops, tokens, quests) but would give points at `skill`
