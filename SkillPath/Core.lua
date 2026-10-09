@@ -217,12 +217,15 @@ end
 
 -- Recipes that are not planned (drops, tokens, quests) but would give points at `skill`
 function SP:MissingRecipes(line, skill, limit)
-	local list = {}
+	local list, seen = {}, {}
 	local known = self:Char().known
 	for _, r in ipairs(Data.recipes[line] or {}) do
 		local spell = r[F.SPELL]
+		-- one entry per created item (Alliance/Horde variants of a recipe look the same)
+		local key = r[F.CREATED] > 0 and r[F.CREATED] or -spell
 		if not known[spell] and not Data.cooldown[spell] and r[F.SOURCE] ~= Planner.SOURCE_TRAINER
-			and r[F.LEARN] <= skill and r[F.GREY] > skill and Data.recipeItem[spell] then
+			and r[F.LEARN] <= skill and r[F.GREY] > skill and Data.recipeItem[spell] and not seen[key] then
+			seen[key] = true
 			list[#list + 1] = r
 		end
 	end

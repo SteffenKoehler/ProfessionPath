@@ -19,7 +19,8 @@ local entries, materials = {}, {}
 local materialTotal = 0
 local matLabel, priceLabel, hintLabel
 local AVOID_ICON = "Interface\\Buttons\\UI-GroupLoot-Pass-Up"
-local USE_AGAIN_ICON = "Interface\\Buttons\\UI-RefreshButton"
+-- undo arrow of the equipment manager (exists in 3.3.5)
+local USE_AGAIN_ICON = "Interface\\PaperDollInfoFrame\\UI-GearManager-Undo"
 local selected, rank = nil, 0
 local gathering = false
 local dirty, sinceRefresh, retries = true, 0, 0
@@ -414,7 +415,7 @@ local function UpdateMaterials()
 			row.item = m.item
 			row.icon:SetTexture(SP:ItemIcon(m.item))
 			row.avoidButton:Show()
-			row.avoidButton:SetNormalTexture(SkillPathDB.avoid[m.item] and USE_AGAIN_ICON or AVOID_ICON)
+			row.avoidButton.icon:SetTexture(SkillPathDB.avoid[m.item] and USE_AGAIN_ICON or AVOID_ICON)
 			if SkillPathDB.avoid[m.item] then
 				row.icon:SetDesaturated(true)
 				row.text:SetText("|cff808080" .. name .. "|r")
@@ -671,7 +672,11 @@ local function CreateMainFrame()
 		avoid:SetHeight(14)
 		avoid:SetPoint("RIGHT", row, "RIGHT", -2, 0)
 		avoid:SetFrameLevel(row:GetFrameLevel() + 1)
-		avoid:SetHighlightTexture("Interface\\Buttons\\UI-GroupLoot-Pass-Highlight", "ADD")
+		-- own texture object, switched between the avoid and the undo icon
+		avoid.icon = avoid:CreateTexture(nil, "ARTWORK")
+		avoid.icon:SetAllPoints()
+		avoid.icon:SetTexture(AVOID_ICON)
+		avoid:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
 		avoid:SetScript("OnClick", function()
 			if row.item and not row.gatherRow then
 				SP:ToggleAvoid(row.item)
