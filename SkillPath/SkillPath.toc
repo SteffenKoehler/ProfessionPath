@@ -2,11 +2,13 @@
 ## Title: SkillPath
 ## Notes: Profession leveling route for every profession, calculated from the game data (/skillpath)
 ## Notes-deDE: Berufe-Leveling-Route für alle Berufe, berechnet aus den Spieldaten (/skillpath)
-## Version: 0.2.0
+## Version: 0.3.0
 ## SavedVariables: SkillPathDB
 
 Locales.lua
 Data.lua
 Planner.lua
+GatherData.lua
+Gather.lua
 Core.lua
 UI.lua

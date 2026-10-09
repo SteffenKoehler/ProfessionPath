@@ -24,6 +24,11 @@ local RACE_IDS = {Human = 1, Orc = 2, Dwarf = 3, NightElf = 4, Scourge = 5, Taur
 
 -- Localized profession names from the profession spells; smelting opens its own window
 local SMELTING_SPELL = 2656
+-- Gathering professions: their spell carries the profession name (Skinning, Fishing);
+-- Herbalism's spell is called "Herb Gathering", so its name comes from this list
+local GATHER_SPELLS = {[393] = 8613, [356] = 7620}
+local HERBALISM_NAMES = {enUS = "Herbalism", enGB = "Herbalism", deDE = "Kräuterkunde", frFR = "Herboristerie",
+	esES = "Herboristería", esMX = "Herboristería", ruRU = "Травничество"}
 SP.skillName, SP.nameToSkill, SP.skillOrder = {}, {}, {}
 
 local function InitNames()
@@ -39,6 +44,18 @@ local function InitNames()
 	if smelting then
 		SP.nameToSkill[smelting] = 186
 	end
+	for line, spell in pairs(GATHER_SPELLS) do
+		local name = GetSpellInfo(spell)
+		if name then
+			SP.skillName[line] = name
+			SP.nameToSkill[name] = line
+		end
+		SP.skillOrder[#SP.skillOrder + 1] = line
+	end
+	local herbalism = HERBALISM_NAMES[GetLocale()] or HERBALISM_NAMES.enUS
+	SP.skillName[182] = herbalism
+	SP.nameToSkill[herbalism] = 182
+	SP.skillOrder[#SP.skillOrder + 1] = 182
 	table.sort(SP.skillOrder, function(a, b)
 		return (SP.skillName[a] or "") < (SP.skillName[b] or "")
 	end)

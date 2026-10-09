@@ -8,7 +8,8 @@ LOCALE = "deDE"
 # lowest -> highest priority
 ARCHIVES = ["locale-%s.MPQ", "expansion-locale-%s.MPQ", "lichking-locale-%s.MPQ",
             "patch-%s.MPQ", "patch-%s-2.MPQ", "patch-%s-3.MPQ"]
-NAMES = ["SkillLineAbility", "Spell", "SkillLine", "Lock", "SkillRaceClassInfo", "SpellFocusObject", "TotemCategory"]
+NAMES = ["SkillLineAbility", "Spell", "SkillLine", "Lock", "SkillRaceClassInfo", "SpellFocusObject", "TotemCategory",
+         "AreaTable", "WorldMapArea", "WorldMapContinent"]
 
 os.makedirs(OUT, exist_ok=True)
 found = {}

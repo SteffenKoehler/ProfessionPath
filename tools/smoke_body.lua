@@ -10,6 +10,10 @@ for line, spell in pairs(SkillPathData.skills) do
 	SP.nameToSkill[name] = line
 	SP.skillOrder[#SP.skillOrder + 1] = line
 end
+for _, line in ipairs({182, 393, 356}) do
+	SP.skillName[line] = "Gather" .. line
+	SP.skillOrder[#SP.skillOrder + 1] = line
+end
 table.sort(SP.skillOrder)
 
 assert(SP:ScanTradeSkill() == 197, "scan should map tailoring")
@@ -21,8 +25,10 @@ assert(profs[197] and profs[197].rank == 120, "tailoring rank")
 for _, line in ipairs(SP.skillOrder) do
 	SP:Show(line)
 	SP:Refresh()
-	local steps, reached = SP:Plan(line, 1)
-	print(string.format("skill %d: %d steps, reached %d", line, #steps, reached))
+	if not SP.Gather.IsGather(line) then
+		local steps, reached = SP:Plan(line, 1)
+		print(string.format("skill %d: %d steps, reached %d", line, #steps, reached))
+	end
 end
 SP:Toggle()
 SP:Toggle()
@@ -61,3 +67,14 @@ do
 	assert(crafts < 60, "too many crafts for 132-150: " .. crafts)
 end
 print("effort check ok")
+
+-- gathering: every profession plans to 450 for a level 80 character of both factions
+for _, line in ipairs({182, 186, 393}) do
+	for _, faction in ipairs({2, 4}) do
+		local steps, reached = SP.Gather.Plan(line, 1, 450, {level = 80, faction = faction})
+		assert(reached == 450, "gathering " .. line .. " stops at " .. reached)
+	end
+end
+local fish = SP.Gather.PlanFishing(1, 450, {level = 80, faction = 2})
+assert(#fish == 6 and #fish[1].areas > 0, "fishing bands")
+print("gathering ok")

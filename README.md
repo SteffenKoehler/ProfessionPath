@@ -24,7 +24,13 @@ cost, from the recipes you can actually get.
   **Auctioneer** or **Auctionator** if one of them is installed, otherwise estimated from
   the vendor sell price. Intermediates (bolts of cloth, bars) cost the cheaper of buying
   and crafting them.
-- Recipe skill-up chance: orange 100 %, then falling linearly to 0 at grey.
+- Recipe skill-up chance: orange 100 %, then falling linearly to 0 at grey. Recipes close
+  to grey are only planned when nothing else gives points.
+- Gathering professions: **Herbalism, Mining and Skinning** show which zone to go to at
+  which skill (zone with the most spawns that give points, weighted by spawn pools),
+  with zone level and an estimate of how often to gather; zones far above your level or
+  of the other faction are only suggested when nothing else fits. **Fishing** shows
+  zones where you catch fish at each rank and how many catches a point takes.
 - Names come from your game client, so the addon works in German, English, French, ...
   without translation tables. The interface itself is in English and German.
 
@@ -43,18 +49,22 @@ Copy the folder `SkillPath` into `Interface/AddOns/` and **restart the game clie
 
 `SkillPath/Data.lua` is generated, not written by hand:
 
-1. `tools/extract_dbc.py` reads `SkillLineAbility.dbc` and `Spell.dbc` from the client's MPQ
-   archives (recipe skill levels, reagents, created items). The raw files stay local.
+1. `tools/extract_dbc.py` reads `SkillLineAbility.dbc`, `Spell.dbc`, `Lock.dbc`,
+   `AreaTable.dbc` and `WorldMapArea.dbc` from the client's MPQ archives (recipe skill
+   levels, reagents, gathering node skills, zones). The raw files stay local.
 2. `tools/build_data.py` combines them with the trainer, vendor and item tables of
    [AzerothCore](https://github.com/azerothcore/azerothcore-wotlk) (GPL-2.0) to know where a
    recipe is learned and at which skill, and writes `Data.lua` (IDs and numbers only).
 
-`tools/test_planner.py <skill line>` prints a route outside the game, `tools/smoke_test.py`
+3. `tools/build_gather.py` writes `GatherData.lua` from AzerothCore's spawn, loot, pool and
+   fishing tables: node spawns and skinnable beasts per zone, zone levels, fishing skill.
+
+`tools/test_planner.py <skill line>` and `tools/test_gather.py <skill line> [level] [faction]`
+print routes outside the game, `tools/smoke_test.py`
 loads the whole addon against a stubbed WoW API.
 
 ## Roadmap
 
-- Gathering professions and Fishing: where to gather at which skill.
 - Highlight the recommended recipe in the profession window.
 - Recipe sources (trainer, vendor, drop) in more detail.
 

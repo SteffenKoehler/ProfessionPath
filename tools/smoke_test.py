@@ -70,13 +70,15 @@ SlashCmdList = {}
 GetTime = function() return 1000 end
 IsModifiedClick = function() return false end
 ChatEdit_InsertLink = noop
+UnitLevel = function() return 32 end
+UnitFactionGroup = function() return "Horde" end
 """
 
 
 def main():
     lua = lupa.LuaRuntime()
     lua.execute(STUBS)
-    for f in ("Locales.lua", "Data.lua", "Planner.lua", "Core.lua", "UI.lua"):
+    for f in ("Locales.lua", "Data.lua", "Planner.lua", "GatherData.lua", "Gather.lua", "Core.lua", "UI.lua"):
         lua.execute(open(os.path.join(ADDON, f), encoding="utf-8").read())
     lua.execute("SkillPathDB = {chars = {}, options = {vendorRecipes = true}, avoid = {}}")
     lua.execute(open(os.path.join(HERE, "smoke_body.lua"), encoding="utf-8").read())

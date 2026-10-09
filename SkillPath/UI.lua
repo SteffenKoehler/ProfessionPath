@@ -6,6 +6,7 @@ local L = SP.L
 local Planner = SP.Planner
 local Data = SkillPathData
 local F = Planner.FIELDS
+local Gather = SP.Gather
 
 local WIDTH, HEIGHT = 440, 540
 local ROW_HEIGHT = 18
@@ -18,6 +19,7 @@ local entries, materials = {}, {}
 local materialTotal = 0
 local matLabel, priceLabel
 local selected, rank = nil, 0
+local gathering = false
 local dirty, sinceRefresh, retries = true, 0, 0
 
 local function Backdrop(f)
@@ -122,7 +124,100 @@ local function ShowMaterialTooltip(row)
 	GameTooltip:Show()
 end
 
+local SKIN_ICON = "Interface\\Icons\\INV_Misc_Pelt_Wolf_01"
+local FISH_ICON = "Interface\\Icons\\Trade_Fishing"
+
+local function PlayerLevel()
+	return UnitLevel("player") or 80
+end
+
+local function ZoneLabel(area)
+	local level = Gather.ZoneLevel(area)
+	local color = level > PlayerLevel() + 4 and "ff4040" or "aaaaaa"
+	return format("%s |cff%s(%d)|r", Gather.ZoneName(area), color, level)
+end
+
+local function ShowGatherTooltip(row)
+	local entry = row.entry
+	local step = entry and entry.gather
+	if not step then
+		return
+	end
+	GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
+	GameTooltip:SetText(Gather.ZoneName(step.area))
+	local level = Gather.ZoneLevel(step.area)
+	if level > PlayerLevel() + 4 then
+		GameTooltip:AddLine(format(L["Zone level %d - above your level"], level), 1, 0.25, 0.25)
+	else
+		GameTooltip:AddLine(format(L["Zone level %d"], level), 0.7, 0.7, 0.7)
+	end
+	GameTooltip:AddLine(" ")
+	local s = math.max(rank, step.from)
+	for _, c in ipairs(Gather.ZoneContents(selected, step.area, step.from, step.to)) do
+		local color = COLORS[Gather.Color(c.req, s)]
+		if c.item then
+			GameTooltip:AddDoubleLine("|cff" .. color .. SP:ItemName(c.item) .. "|r", format(L["from skill %d, ~%d spawns"], c.req, c.count))
+		else
+			GameTooltip:AddDoubleLine("|cff" .. color .. format(L["Beasts level %d-%d"], c.minLevel, c.maxLevel) .. "|r",
+				format(L["~%d spawns"], c.count))
+		end
+	end
+	GameTooltip:AddLine(" ")
+	GameTooltip:AddLine(format(L["Skill %d-%d, about %d gathers"], step.from, step.to, step.gathers), 1, 1, 1)
+	GameTooltip:Show()
+end
+
+local function ShowFishTooltip(row)
+	local step = row.entry and row.entry.fish
+	if not step then
+		return
+	end
+	GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
+	GameTooltip:SetText(format(L["Skill %d-%d, about %d catches"], step.from, step.to, step.catches))
+	GameTooltip:AddLine(L["Zones where you catch fish at this skill:"], 0.7, 0.7, 0.7)
+	for _, area in ipairs(step.areas) do
+		GameTooltip:AddDoubleLine(ZoneLabel(area), format(L["minimum skill %d"], SkillPathGather.fishing[area]), 1, 1, 1, 0.7, 0.7, 0.7)
+	end
+	GameTooltip:Show()
+end
+
 -- Data ------------------------------------------------------------------------------------
+
+-- Rank notes before the step that goes past the next cap; state = {next = index}
+local function AddRankNotes(stepTo, maxRank, state)
+	while SP.RANKS[state.next] and stepTo > SP.RANKS[state.next].cap do
+		local r = SP.RANKS[state.next]
+		if maxRank <= r.cap then
+			entries[#entries + 1] = {note = format(L["Learn %s at your trainer (from skill %d, level %d)"],
+				L[r.name], r.skill, r.level), color = "66ccff"}
+		end
+		state.next = state.next + 1
+	end
+end
+
+local function BuildGather(maxRank)
+	local opts = {level = PlayerLevel(), faction = UnitFactionGroup("player") == "Alliance" and 2 or 4}
+	local state = {next = 1}
+	if selected == Gather.FISHING then
+		local steps = Gather.PlanFishing(math.max(1, rank), SP.MAX_SKILL, opts)
+		for _, step in ipairs(steps) do
+			AddRankNotes(step.to, maxRank, state)
+			entries[#entries + 1] = {fish = step}
+		end
+		return
+	end
+	local steps, reached = Gather.Plan(selected, rank, SP.MAX_SKILL, opts)
+	for _, step in ipairs(steps) do
+		AddRankNotes(step.to, maxRank, state)
+		entries[#entries + 1] = {gather = step}
+	end
+	if reached >= SP.MAX_SKILL and rank >= SP.MAX_SKILL then
+		entries[#entries + 1] = {note = L["Done - maximum skill reached."], color = "40bf40"}
+	end
+	for _, c in ipairs(Gather.PointsNow(selected, math.max(1, rank))) do
+		materials[#materials + 1] = {gather = c}
+	end
+end
 
 local function Build()
 	wipe(entries)
@@ -142,22 +237,20 @@ local function Build()
 		status:SetText(format("%s  |cff808080%s|r", name, L["Not learned"]))
 	end
 
+	gathering = Gather.IsGather(selected)
+	if gathering then
+		BuildGather(maxRank)
+		return
+	end
+
 	if info and not (SP:Char().scanned or {})[selected] then
 		entries[#entries + 1] = {note = L["Open the profession window once so SkillPath knows your recipes."], color = "ff8040"}
 	end
 
 	local steps, reached = SP:Plan(selected, rank)
-	local nextRank = 1
+	local state = {next = 1}
 	for _, step in ipairs(steps) do
-		-- rank notes before the step that goes past the next cap
-		while SP.RANKS[nextRank] and step.to > SP.RANKS[nextRank].cap do
-			local r = SP.RANKS[nextRank]
-			if maxRank <= r.cap then
-				entries[#entries + 1] = {note = format(L["Learn %s at your trainer (from skill %d, level %d)"],
-					L[r.name], r.skill, r.level), color = "66ccff"}
-			end
-			nextRank = nextRank + 1
-		end
+		AddRankNotes(step.to, maxRank, state)
 		entries[#entries + 1] = {step = step}
 	end
 	if reached >= SP.MAX_SKILL and rank >= SP.MAX_SKILL then
@@ -221,6 +314,31 @@ local function UpdateRoute()
 				row.icon:SetTexture(nil)
 				row.text:SetText("|cff" .. entry.color .. entry.note .. "|r")
 				row:SetScript("OnEnter", ShowNoteTooltip)
+			elseif entry.gather or entry.fish then
+				local step = entry.gather or entry.fish
+				local done = rank >= step.to
+				if rank >= step.from and rank < step.to then
+					row.highlight:Show()
+				end
+				local where
+				if entry.fish then
+					row.icon:SetTexture(FISH_ICON)
+					local names = {}
+					for _, area in ipairs(step.areas) do
+						names[#names + 1] = Gather.ZoneName(area)
+					end
+					where = table.concat(names, ", ")
+					row.right:SetText(done and "" or format("~%d", step.catches))
+					row:SetScript("OnEnter", ShowFishTooltip)
+				else
+					local contents = Gather.ZoneContents(selected, step.area, step.from, step.to)
+					local first = contents[#contents]
+					row.icon:SetTexture(first and first.item and SP:ItemIcon(first.item) or SKIN_ICON)
+					where = ZoneLabel(step.area)
+					row.right:SetText(done and "" or format("~%d", step.gathers))
+					row:SetScript("OnEnter", ShowGatherTooltip)
+				end
+				row.text:SetText(format("|cffaaaaaa%3d-%3d|r  %s%s|r", step.from, step.to, done and "|cff808080" or "|cffffffff", where))
 			elseif entry.recipe then
 				local r = entry.recipe
 				local spell = r[F.SPELL]
@@ -257,8 +375,26 @@ local function UpdateMaterials()
 	local offset = FauxScrollFrame_GetOffset(matScroll)
 	for i, row in ipairs(matRows) do
 		local m = materials[offset + i]
+		row.gatherRow = m and m.gather and true or nil
 		if not m then
 			row:Hide()
+		elseif m.gather then
+			row:Show()
+			local c = m.gather
+			local color = COLORS[Gather.Color(c.req, math.max(1, rank))]
+			row.icon:SetDesaturated(false)
+			if c.item then
+				row.item = c.item
+				row.icon:SetTexture(SP:ItemIcon(c.item))
+				row.text:SetText("|cff" .. color .. SP:ItemName(c.item) .. "|r")
+				row:SetScript("OnEnter", ShowItemTooltip)
+			else
+				row.item = nil
+				row.icon:SetTexture(SKIN_ICON)
+				row.text:SetText("|cff" .. color .. format(L["Beasts level %d-%d"], c.minLevel, c.maxLevel) .. "|r")
+				row:SetScript("OnEnter", nil)
+			end
+			row.right:SetText(format("|cffaaaaaa%s|r", format(L["from skill %d"], c.req)))
 		else
 			row:Show()
 			local name, color = SP:ItemName(m.item)
@@ -279,6 +415,17 @@ local function UpdateMaterials()
 		end
 	end
 	FauxScrollFrame_Update(matScroll, #materials, MAT_ROWS, ROW_HEIGHT)
+	if gathering then
+		if selected == Gather.FISHING then
+			matLabel:SetText(format(L["Catches per skill point at your skill: %d"], Gather.FishCatches(math.max(1, rank))))
+		else
+			matLabel:SetText(L["Gives skill points at your skill now"])
+		end
+		priceLabel:SetText("")
+		vendorCheck:Hide()
+		return
+	end
+	vendorCheck:Show()
 	local source = SP:PriceSource()
 	matLabel:SetText(format("%s  |cffffffff~%s|r", L["Materials for the rest of the route"],
 		GetCoinTextureString(math.floor(materialTotal / 100) * 100)))
@@ -427,7 +574,7 @@ local function CreateMainFrame()
 			if not self.item then
 				return
 			end
-			if button == "RightButton" then
+			if button == "RightButton" and not self.gatherRow then
 				SP:ToggleAvoid(self.item)
 				SP:Refresh()
 				ShowMaterialTooltip(self)
