@@ -292,16 +292,24 @@ local function Build()
 	table.sort(materials, function(a, b)
 		return a.need > b.need
 	end)
-	-- avoided materials the route no longer needs stay listed, so they can be used again
-	for item in pairs(SkillPathDB.avoid) do
-		local listed
-		for _, m in ipairs(materials) do
-			if m.item == item then
-				listed = true
-				break
+	-- Avoided materials the route no longer needs stay listed (so they can be used again)
+	-- while a recipe of this profession that still gives points uses them; once all of
+	-- those are grey, they drop out of the list but stay avoided.
+	local listed, relevant = {}, {}
+	for _, m in ipairs(materials) do
+		listed[m.item] = true
+	end
+	for _, r in ipairs(Data.recipes[selected] or {}) do
+		if r[F.GREY] > rank then
+			for i = F.REAGENTS, #r, 2 do
+				if SkillPathDB.avoid[r[i]] then
+					relevant[r[i]] = true
+				end
 			end
 		end
-		if not listed then
+	end
+	for item in pairs(SkillPathDB.avoid) do
+		if relevant[item] and not listed[item] then
 			materials[#materials + 1] = {item = item, need = 0, have = GetItemCount(item, true)}
 		end
 	end
