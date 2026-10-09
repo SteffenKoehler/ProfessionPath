@@ -79,7 +79,7 @@ SetMapZoom = function(c, i) zoomed = (c == 1) and ({"GrizzlyHills", "HowlingFjor
 GetMapInfo = function() return zoomed end
 SetMapToCurrentZone = noop
 CloseDropDownMenus = noop
-GetAddOnMetadata = function() return "0.5.0" end
+GetAddOnMetadata = function() return "1.0.0" end
 UnitFactionGroup = function() return "Horde" end
 """
 
