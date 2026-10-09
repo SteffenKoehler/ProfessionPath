@@ -1,11 +1,11 @@
--- SkillPath gathering professions: which zone to gather in at which skill (Herbalism,
+-- ProfessionPath gathering professions: which zone to gather in at which skill (Herbalism,
 -- Mining, Skinning) and where to fish. Pure logic; zone names are read from the world map.
 
-SkillPath = SkillPath or {}
+ProfessionPath = ProfessionPath or {}
 local G = {}
-SkillPath.Gather = G
+ProfessionPath.Gather = G
 
-local Data = SkillPathGather
+local Data = ProfessionPathGather
 G.HERBALISM, G.MINING, G.SKINNING, G.FISHING = 182, 186, 393, 356
 G.LINES = {[182] = true, [186] = true, [393] = true, [356] = true}
 

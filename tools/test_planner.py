@@ -21,13 +21,13 @@ for row in sp.rows():
             break
 
 lua = lupa.LuaRuntime()
-addon = os.path.join(HERE, "..", "SkillPath")
+addon = os.path.join(HERE, "..", "ProfessionPath")
 for f in ("Data.lua", "Planner.lua"):
     lua.execute(open(os.path.join(addon, f), encoding="utf-8").read())
 run = lua.eval("""function(skill, from, to, race)
-    local opts = {cooldown = SkillPathData.cooldown, known = {}, vendorRecipes = true, raceBit = race,
-        price = function(item) return SkillPath.Planner.EstimatePrice(item, SkillPathData) end}
-    local steps, reached = SkillPath.Planner.Plan(SkillPathData.recipes[skill], from, to, opts)
+    local opts = {cooldown = ProfessionPathData.cooldown, known = {}, vendorRecipes = true, raceBit = race,
+        price = function(item) return ProfessionPath.Planner.EstimatePrice(item, ProfessionPathData) end}
+    local steps, reached = ProfessionPath.Planner.Plan(ProfessionPathData.recipes[skill], from, to, opts)
     local out = {}
     for i, st in ipairs(steps) do
         out[i] = {st.recipe[1], st.from, st.to, st.crafts, st.recipe[3], st.recipe[4], st.recipe[5], st.recipe[2]}

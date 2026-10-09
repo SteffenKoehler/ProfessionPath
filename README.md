@@ -1,9 +1,9 @@
-# SkillPath
+# ProfessionPath
 
 Profession leveling routes for **World of Warcraft 3.3.5a** (Wrath of the Lich King), shown
 directly in the game - for every profession, in every client language.
 
-Instead of copying a written guide, SkillPath **calculates** the route from the game data:
+Instead of copying a written guide, ProfessionPath **calculates** the route from the game data:
 for each skill point it picks the recipe with the best ratio of skill-up chance to material
 cost, from the recipes you can actually get.
 
@@ -36,21 +36,21 @@ cost, from the recipes you can actually get.
 
 ## Usage
 
-- `/skillpath` or `/spath` toggles the window, or click the scroll tab on the right edge of
+- `/professionpath` or `/ppath` toggles the window, or click the scroll tab on the right edge of
   the profession window (like the tabs of the spellbook).
-- Open each profession window once, so SkillPath knows the recipes you already have.
-- In the profession window SkillPath marks the recommended recipe at the right edge of its
-  row; the crosshair tab below the SkillPath tab selects it (clearing filters if needed)
+- Open each profession window once, so ProfessionPath knows the recipes you already have.
+- In the profession window ProfessionPath marks the recommended recipe at the right edge of its
+  row; the crosshair tab below the ProfessionPath tab selects it (clearing filters if needed)
   and enters the number of crafts.
 
 ## Installation
 
-Copy the folder `SkillPath` into `Interface/AddOns/` and **restart the game client** (WoW
+Copy the folder `ProfessionPath` into `Interface/AddOns/` and **restart the game client** (WoW
 3.3.5a only picks up new addon folders after a full restart).
 
 ## How the data is made
 
-`SkillPath/Data.lua` is generated, not written by hand:
+`ProfessionPath/Data.lua` is generated, not written by hand:
 
 1. `tools/extract_dbc.py` reads `SkillLineAbility.dbc`, `Spell.dbc`, `Lock.dbc`,
    `AreaTable.dbc` and `WorldMapArea.dbc` from the client's MPQ archives (recipe skill

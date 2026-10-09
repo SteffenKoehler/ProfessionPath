@@ -1,4 +1,4 @@
-# Builds SkillPath/Data.lua from the client DBCs (tools/dbc, see extract_dbc.py) and the
+# Builds ProfessionPath/Data.lua from the client DBCs (tools/dbc, see extract_dbc.py) and the
 # AzerothCore trainer/vendor/item tables (tools/cache, GPL-2.0). Only IDs and numbers end up
 # in the addon; all names come from the game client at runtime (GetSpellInfo/GetItemInfo).
 import os, re, sys
@@ -10,7 +10,7 @@ from dbc import DBC
 
 DBC_DIR = os.path.join(HERE, "dbc")
 CACHE = os.path.join(HERE, "cache")
-OUT = os.path.join(HERE, "..", "SkillPath", "Data.lua")
+OUT = os.path.join(HERE, "..", "ProfessionPath", "Data.lua")
 
 # skill line -> profession spell (its name is the localized profession name)
 SKILLS = {
@@ -195,7 +195,7 @@ def main():
            "-- recipe = {spell, source (1 auto, 2 trainer, 3 other, 4 vendor recipe), learn, yellow, grey,",
            "--           trainer cost, race mask, required ability, created item, amount, reagent, count, ...}",
            "-- vendor = buy price of vendor reagents, sellPrice = vendor sell price of other reagents",
-           "SkillPathData = {",
+           "ProfessionPathData = {",
            "\tskills = {"]
     for skill, spell in sorted(SKILLS.items()):
         out.append("\t\t[%d] = %d," % (skill, spell))

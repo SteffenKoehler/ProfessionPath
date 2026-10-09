@@ -13,13 +13,13 @@ start = int(sys.argv[4]) if len(sys.argv) > 4 else 1
 
 lua = lupa.LuaRuntime()
 lua.execute("GetLocale = function() return 'deDE' end")
-addon = os.path.join(HERE, "..", "SkillPath")
+addon = os.path.join(HERE, "..", "ProfessionPath")
 for f in ("GatherData.lua", "Gather.lua"):
     lua.execute(open(os.path.join(addon, f), encoding="utf-8").read())
 
 items = {}
 wanted = set()
-for nodes in (lua.eval("SkillPathGather.nodes[%d]" % line) or {}).values():
+for nodes in (lua.eval("ProfessionPathGather.nodes[%d]" % line) or {}).values():
     for i in range(1, len(nodes) + 1, 3):
         wanted.add(nodes[i])
 if wanted:
@@ -27,7 +27,7 @@ if wanted:
         if row[0] in wanted:
             items[row[0]] = row[4]
 
-G = lua.eval("SkillPath.Gather")
+G = lua.eval("ProfessionPath.Gather")
 opts = lua.table_from({"level": level, "faction": faction})
 if line == 356:
     steps, reached = G.PlanFishing(start, 450, opts)

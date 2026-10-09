@@ -1,7 +1,7 @@
 -- UI texts: English keys, translations per client language (missing ones show the key).
 -- Recipe, item and profession names come from the game client and need no translation.
 
-SkillPath = SkillPath or {}
+ProfessionPath = ProfessionPath or {}
 
 local translations = {
 	deDE = {
@@ -23,9 +23,9 @@ local translations = {
 		["Recipe needed: %s"] = "Rezept nötig: %s",
 		["Learn at trainer from %d (%s)"] = "Beim Lehrer ab %d (%s)",
 		["Skill %d-%d, about %d crafts"] = "Skill %d-%d, etwa %d Mal herstellen",
-		["Open the profession window once so SkillPath knows your recipes."] = "Öffne einmal das Berufsfenster, damit SkillPath deine Rezepte kennt.",
+		["Open the profession window once so ProfessionPath knows your recipes."] = "Öffne einmal das Berufsfenster, damit ProfessionPath deine Rezepte kennt.",
 		["have %d / need %d"] = "vorhanden %d / benötigt %d",
-		["Opens SkillPath for this profession."] = "Öffnet SkillPath für diesen Beruf.",
+		["Opens ProfessionPath for this profession."] = "Öffnet ProfessionPath für diesen Beruf.",
 		["Vendor"] = "Händler",
 		["Auction"] = "Auktionshaus",
 		["Estimate"] = "Schätzung",
@@ -36,7 +36,7 @@ local translations = {
 		["avoided"] = "gemieden",
 		["Prices: %s"] = "Preise: %s",
 		["estimate from vendor prices"] = "Schätzung aus Händlerpreisen",
-		["Please restart the game client completely to load all SkillPath files."] = "Bitte den Spielclient komplett neu starten, damit alle SkillPath-Dateien geladen werden.",
+		["Please restart the game client completely to load all ProfessionPath files."] = "Bitte den Spielclient komplett neu starten, damit alle ProfessionPath-Dateien geladen werden.",
 		["Your professions"] = "Deine Berufe",
 		["All professions"] = "Alle Berufe",
 		["Crafting"] = "Herstellung",
@@ -51,12 +51,12 @@ local translations = {
 		["Avoided, but still needed: in this skill range no other recipe gives enough skill points."] = "Gemieden, wird aber trotzdem gebraucht: In diesem Skillbereich gibt kein anderes Rezept genug Punkte.",
 		["Used by:"] = "Verwendet von:",
 		["Recipe not learned yet"] = "Rezept noch nicht gelernt",
-		["Recommended by SkillPath"] = "Empfohlen von SkillPath",
+		["Recommended by ProfessionPath"] = "Empfohlen von ProfessionPath",
 		["About %d more crafts up to skill %d."] = "Noch etwa %d Mal bis Skill %d.",
 		["Select recommended recipe"] = "Empfohlenes Rezept auswählen",
 		["about %d crafts"] = "etwa %d Mal",
-		["Selects the recipe SkillPath recommends at your skill and enters the number of crafts."] = "Wählt das Rezept aus, das SkillPath bei deinem Skill empfiehlt, und trägt die Anzahl ein.",
-		["SkillPath has no recommendation for this profession at your skill."] = "SkillPath hat für diesen Beruf bei deinem Skill keine Empfehlung.",
+		["Selects the recipe ProfessionPath recommends at your skill and enters the number of crafts."] = "Wählt das Rezept aus, das ProfessionPath bei deinem Skill empfiehlt, und trägt die Anzahl ein.",
+		["ProfessionPath has no recommendation for this profession at your skill."] = "ProfessionPath hat für diesen Beruf bei deinem Skill keine Empfehlung.",
 		["%s is not learned yet."] = "%s ist noch nicht gelernt.",
 		["The route plans %s - not learned yet."] = "Die Route plant %s - noch nicht gelernt.",
 		["Until then this is your best known recipe."] = "Bis dahin ist dies dein bestes bekanntes Rezept.",
@@ -76,13 +76,13 @@ local translations = {
 		["from skill %d"] = "ab Skill %d",
 		["Gives skill points at your skill now"] = "Gibt bei deinem Skill jetzt Punkte",
 		["Catches per skill point at your skill: %d"] = "Fänge pro Skillpunkt bei deinem Skill: %d",
-		["Commands: /skillpath (or /spath) - toggle the window"] = "Befehle: /skillpath (oder /spath) - Fenster ein/aus",
+		["Commands: /professionpath (or /ppath) - toggle the window"] = "Befehle: /professionpath (oder /ppath) - Fenster ein/aus",
 	},
 }
 
 local locale = GetLocale()
 local current = translations[locale] or {}
-SkillPath.L = setmetatable({}, {
+ProfessionPath.L = setmetatable({}, {
 	__index = function(_, key)
 		return current[key] or key
 	end

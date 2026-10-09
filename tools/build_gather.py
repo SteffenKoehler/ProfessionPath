@@ -1,4 +1,4 @@
-# Builds SkillPath/GatherData.lua: where to gather at which skill (Herbalism, Mining,
+# Builds ProfessionPath/GatherData.lua: where to gather at which skill (Herbalism, Mining,
 # Skinning, Fishing). Sources: client DBCs (Lock, AreaTable, WorldMapArea) and the
 # AzerothCore spawn/template/loot/fishing tables (GPL-2.0). IDs and numbers only; zone
 # and item names come from the game client at runtime.
@@ -11,7 +11,7 @@ from dbc import DBC
 from build_data import sql_rows
 
 DBC_DIR = os.path.join(HERE, "dbc")
-OUT = os.path.join(HERE, "..", "SkillPath", "GatherData.lua")
+OUT = os.path.join(HERE, "..", "ProfessionPath", "GatherData.lua")
 
 HERBALISM, MINING, SKINNING, FISHING = 182, 186, 393, 356
 LOCK_KEY_SKILL = 2
@@ -197,7 +197,7 @@ def main():
            "--               German name, internal map name} (names only as fallback, see Gather.lua)",
            "-- nodes[skill][area] = {item, required skill, spawns, ...}",
            "-- skins[area] = {creature level, spawns, ...}; fishing[area] = minimum skill",
-           "SkillPathGather = {",
+           "ProfessionPathGather = {",
            "\tzones = {"]
     for z in sorted(used_zones):
         out.append("\t\t[%d] = {%d, %d, %d, %d, %s, %s}," % (z, worldmap[z], info[z]["map"], zone_level.get(z, 0),

@@ -4,7 +4,7 @@
 --               German name, internal map name} (names only as fallback, see Gather.lua)
 -- nodes[skill][area] = {item, required skill, spawns, ...}
 -- skins[area] = {creature level, spawns, ...}; fishing[area] = minimum skill
-SkillPathGather = {
+ProfessionPathGather = {
 	zones = {
 		[1] = {27, 0, 7, 2, "Dun Morogh", "DunMorogh"},
 		[3] = {17, 0, 39, 0, "Ödland", "Badlands"},

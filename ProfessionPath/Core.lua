@@ -1,11 +1,11 @@
--- SkillPath core: professions and skill of the player, known recipes (read from the
+-- ProfessionPath core: professions and skill of the player, known recipes (read from the
 -- profession window), route calculation and item names.
 
-SkillPath = SkillPath or {}
-local SP = SkillPath
+ProfessionPath = ProfessionPath or {}
+local SP = ProfessionPath
 local L = SP.L
 local Planner = SP.Planner
-local Data = SkillPathData
+local Data = ProfessionPathData
 local F = Planner.FIELDS
 
 SP.MAX_SKILL = 450
@@ -67,7 +67,7 @@ end
 
 function SP:Char()
 	local key = CharKey()
-	local chars = SkillPathDB.chars
+	local chars = ProfessionPathDB.chars
 	chars[key] = chars[key] or {known = {}, skills = {}}
 	return chars[key]
 end
@@ -146,7 +146,7 @@ function SP:Plan(line, from, onlyKnown, to)
 		end,
 		cooldown = Data.cooldown,
 		known = char.known,
-		vendorRecipes = SkillPathDB.options.vendorRecipes,
+		vendorRecipes = ProfessionPathDB.options.vendorRecipes,
 		raceBit = self:RaceBit(),
 		hasAbility = function(spell)
 			return IsSpellKnown and IsSpellKnown(spell) or false
@@ -218,13 +218,13 @@ end
 -- Avoiding is per profession: a material that is not worth it in one profession can still
 -- be the cheapest way in another.
 function SP:IsAvoided(item, line)
-	local list = SkillPathDB.avoided[line]
+	local list = ProfessionPathDB.avoided[line]
 	return list and list[item] or false
 end
 
 function SP:ToggleAvoid(item, line)
-	local list = SkillPathDB.avoided[line] or {}
-	SkillPathDB.avoided[line] = list
+	local list = ProfessionPathDB.avoided[line] or {}
+	ProfessionPathDB.avoided[line] = list
 	list[item] = not list[item] or nil
 	SP.recommendVersion = (SP.recommendVersion or 0) + 1
 end
@@ -254,7 +254,7 @@ end
 
 -- Item names: cached ones directly, others are requested from the server via a hidden
 -- tooltip; the UI refreshes a moment later.
-local scanTip = CreateFrame("GameTooltip", "SkillPathScanTooltip", nil, "GameTooltipTemplate")
+local scanTip = CreateFrame("GameTooltip", "ProfessionPathScanTooltip", nil, "GameTooltipTemplate")
 scanTip:SetOwner(WorldFrame, "ANCHOR_NONE")
 local requested = {}
 SP.missingNames = 0
@@ -293,15 +293,15 @@ events:RegisterEvent("SKILL_LINES_CHANGED")
 events:RegisterEvent("BAG_UPDATE")
 events:SetScript("OnEvent", function(_, event, arg1)
 	if event == "ADDON_LOADED" then
-		if arg1 == "SkillPath" then
-			SkillPathDB = SkillPathDB or {}
-			SkillPathDB.chars = SkillPathDB.chars or {}
-			SkillPathDB.options = SkillPathDB.options or {}
+		if arg1 == "ProfessionPath" then
+			ProfessionPathDB = ProfessionPathDB or {}
+			ProfessionPathDB.chars = ProfessionPathDB.chars or {}
+			ProfessionPathDB.options = ProfessionPathDB.options or {}
 			-- per profession since 0.4.0; the old account-wide list is dropped once
-			SkillPathDB.avoid = nil
-			SkillPathDB.avoided = SkillPathDB.avoided or {}
-			if SkillPathDB.options.vendorRecipes == nil then
-				SkillPathDB.options.vendorRecipes = true
+			ProfessionPathDB.avoid = nil
+			ProfessionPathDB.avoided = ProfessionPathDB.avoided or {}
+			if ProfessionPathDB.options.vendorRecipes == nil then
+				ProfessionPathDB.options.vendorRecipes = true
 			end
 		elseif arg1 == "Blizzard_TradeSkillUI" and SP.AttachTradeSkillButton then
 			SP:AttachTradeSkillButton()
@@ -321,8 +321,8 @@ events:SetScript("OnEvent", function(_, event, arg1)
 	end
 end)
 
-SLASH_SKILLPATH1 = "/skillpath"
-SLASH_SKILLPATH2 = "/spath"
-SlashCmdList["SKILLPATH"] = function()
+SLASH_PROFESSIONPATH1 = "/professionpath"
+SLASH_PROFESSIONPATH2 = "/ppath"
+SlashCmdList["PROFESSIONPATH"] = function()
 	SP:Toggle()
 end

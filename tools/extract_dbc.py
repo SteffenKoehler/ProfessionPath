@@ -1,4 +1,4 @@
-# Extract the DBC files SkillPath needs from the client's MPQ archives (newest patch wins).
+# Extract the DBC files ProfessionPath needs from the client's MPQ archives (newest patch wins).
 # Raw DBCs are Blizzard data: they stay local (tools/dbc is git-ignored).
 import os, sys, mpyq
 

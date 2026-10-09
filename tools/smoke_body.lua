@@ -1,10 +1,10 @@
 -- Executed by smoke_test.py after the addon files are loaded.
-local SP = SkillPath
+local SP = ProfessionPath
 
 -- the event frame is the first frame Core.lua created; trigger its handler via the events
 -- the addon listens to by calling the same functions it would call
 SP.skillName, SP.nameToSkill, SP.skillOrder = {}, {}, {}
-for line, spell in pairs(SkillPathData.skills) do
+for line, spell in pairs(ProfessionPathData.skills) do
 	local name = GetSpellInfo(spell)
 	SP.skillName[line] = name
 	SP.nameToSkill[name] = line
@@ -37,7 +37,7 @@ SP:Refresh()
 
 -- prices: vendor reagent uses the vendor price, others an estimate; avoiding changes the route
 local thread = 2320
-assert(SP:Price(thread) == SkillPathData.vendor[thread], "vendor price")
+assert(SP:Price(thread) == ProfessionPathData.vendor[thread], "vendor price")
 local price, source = SP:Price(14047)
 assert(price > 0 and source == "estimate", "estimate for runecloth")
 local before = SP:Plan(129, 300)
@@ -57,9 +57,9 @@ print("price checks ok")
 -- regression: cheap Small Venom Sacs must not lead to ~245 green Anti-Venom crafts at 132
 do
 	local prices = {[1475] = 5, [2592] = 3000}  -- like the user's auction house: sacs free, wool expensive
-	local opts = {cooldown = SkillPathData.cooldown, known = {}, vendorRecipes = true, raceBit = 1,
-		price = function(item) return prices[item] or SkillPath.Planner.EstimatePrice(item, SkillPathData) end}
-	local steps = SkillPath.Planner.Plan(SkillPathData.recipes[129], 132, 150, opts)
+	local opts = {cooldown = ProfessionPathData.cooldown, known = {}, vendorRecipes = true, raceBit = 1,
+		price = function(item) return prices[item] or ProfessionPath.Planner.EstimatePrice(item, ProfessionPathData) end}
+	local steps = ProfessionPath.Planner.Plan(ProfessionPathData.recipes[129], 132, 150, opts)
 	local crafts = 0
 	for _, step in ipairs(steps) do
 		crafts = crafts + step.crafts
@@ -86,13 +86,13 @@ print("zone names ok")
 
 -- still needed check: avoid every material of First Aid 150-210 and refresh the window
 SP:Show(129)
-for _, r in ipairs(SkillPathData.recipes[129]) do
+for _, r in ipairs(ProfessionPathData.recipes[129]) do
 	for i = 11, #r, 2 do
 		if not SP:IsAvoided(r[i], 129) then SP:ToggleAvoid(r[i], 129) end
 	end
 end
 SP:Refresh()
-SkillPathDB.avoided[129] = nil
+ProfessionPathDB.avoided[129] = nil
 SP:Refresh()
 print("still needed ok")
 

@@ -1,10 +1,10 @@
--- SkillPath window: profession selection, route with rank notes, materials with bag counts.
+-- ProfessionPath window: profession selection, route with rank notes, materials with bag counts.
 
-SkillPath = SkillPath or {}
-local SP = SkillPath
+ProfessionPath = ProfessionPath or {}
+local SP = ProfessionPath
 local L = SP.L
 local Planner = SP.Planner
-local Data = SkillPathData
+local Data = ProfessionPathData
 local F = Planner.FIELDS
 local Gather = SP.Gather
 
@@ -243,7 +243,7 @@ local function ShowFishTooltip(row)
 	GameTooltip:SetText(format(L["Skill %d-%d, about %d catches"], step.from, step.to, step.catches))
 	GameTooltip:AddLine(L["Zones where you catch fish at this skill:"], 0.7, 0.7, 0.7)
 	for _, area in ipairs(step.areas) do
-		GameTooltip:AddDoubleLine(ZoneLabel(area), format(L["minimum skill %d"], SkillPathGather.fishing[area]), 1, 1, 1, 0.7, 0.7, 0.7)
+		GameTooltip:AddDoubleLine(ZoneLabel(area), format(L["minimum skill %d"], ProfessionPathGather.fishing[area]), 1, 1, 1, 0.7, 0.7, 0.7)
 	end
 	GameTooltip:Show()
 end
@@ -304,12 +304,12 @@ local function Build()
 		status:SetText(format("%s  |cff808080%s|r", name, L["Not learned"]))
 	end
 
-	-- Gather.lua is missing when the client still has an old SkillPath.toc loaded (the
+	-- Gather.lua is missing when the client still has an old ProfessionPath.toc loaded (the
 	-- client only reads .toc files when it starts)
 	if not Gather then
 		gathering = false
 		if selected == 182 or selected == 393 or selected == 356 then
-			entries[#entries + 1] = {note = L["Please restart the game client completely to load all SkillPath files."], color = "ff4040"}
+			entries[#entries + 1] = {note = L["Please restart the game client completely to load all ProfessionPath files."], color = "ff4040"}
 			return
 		end
 	else
@@ -321,7 +321,7 @@ local function Build()
 	end
 
 	if info and not (SP:Char().scanned or {})[selected] then
-		entries[#entries + 1] = {note = L["Open the profession window once so SkillPath knows your recipes."], color = "ff8040"}
+		entries[#entries + 1] = {note = L["Open the profession window once so ProfessionPath knows your recipes."], color = "ff8040"}
 	end
 
 	local steps, reached = SP:Plan(selected, rank)
@@ -383,7 +383,7 @@ local function Build()
 			end
 		end
 	end
-	for item in pairs(SkillPathDB.avoided[selected] or {}) do
+	for item in pairs(ProfessionPathDB.avoided[selected] or {}) do
 		if relevant[item] and not listed[item] then
 			materials[#materials + 1] = {item = item, need = 0, have = GetItemCount(item, true)}
 		end
@@ -678,7 +678,7 @@ end
 -- Frame -----------------------------------------------------------------------------------
 
 local function CreateMainFrame()
-	frame = CreateFrame("Frame", "SkillPathFrame", UIParent)
+	frame = CreateFrame("Frame", "ProfessionPathFrame", UIParent)
 	frame:SetWidth(WIDTH)
 	frame:SetHeight(HEIGHT)
 	frame:SetPoint("CENTER")
@@ -691,14 +691,14 @@ local function CreateMainFrame()
 	frame:SetScript("OnDragStart", frame.StartMoving)
 	frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
 	frame:Hide()
-	tinsert(UISpecialFrames, "SkillPathFrame")
+	tinsert(UISpecialFrames, "ProfessionPathFrame")
 
-	local title = Label(frame, "SkillPath", "GameFontNormalLarge")
+	local title = Label(frame, "ProfessionPath", "GameFontNormalLarge")
 	title:SetPoint("TOP", 0, -18)
 	local close = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
 	close:SetPoint("TOPRIGHT", -6, -6)
 
-	dropdown = CreateFrame("Frame", "SkillPathDropDown", frame, "UIDropDownMenuTemplate")
+	dropdown = CreateFrame("Frame", "ProfessionPathDropDown", frame, "UIDropDownMenuTemplate")
 	dropdown:SetPoint("TOPLEFT", 4, -40)
 	UIDropDownMenu_SetWidth(dropdown, 150)
 	UIDropDownMenu_Initialize(dropdown, InitDropdown)
@@ -706,13 +706,13 @@ local function CreateMainFrame()
 	status = Label(frame, "", "GameFontNormal")
 	status:SetPoint("LEFT", dropdown, "RIGHT", -6, 2)
 
-	vendorCheck = CreateFrame("CheckButton", "SkillPathVendorCheck", frame, "UICheckButtonTemplate")
+	vendorCheck = CreateFrame("CheckButton", "ProfessionPathVendorCheck", frame, "UICheckButtonTemplate")
 	vendorCheck:SetWidth(24)
 	vendorCheck:SetHeight(24)
 	vendorCheck:SetPoint("TOPLEFT", 20, -72)
-	_G["SkillPathVendorCheckText"]:SetText(L["Use vendor recipes"])
+	_G["ProfessionPathVendorCheckText"]:SetText(L["Use vendor recipes"])
 	vendorCheck:SetScript("OnClick", function(self)
-		SkillPathDB.options.vendorRecipes = self:GetChecked() and true or false
+		ProfessionPathDB.options.vendorRecipes = self:GetChecked() and true or false
 		SP:Refresh()
 	end)
 	vendorCheck:SetScript("OnEnter", function(self)
@@ -726,7 +726,7 @@ local function CreateMainFrame()
 
 	local routeLabel = Label(frame, L["Route"], "GameFontNormal")
 	routeLabel:SetPoint("TOPLEFT", 22, -102)
-	routeScroll = CreateFrame("ScrollFrame", "SkillPathRouteScroll", frame, "FauxScrollFrameTemplate")
+	routeScroll = CreateFrame("ScrollFrame", "ProfessionPathRouteScroll", frame, "FauxScrollFrameTemplate")
 	routeScroll:SetPoint("TOPLEFT", routeLabel, "BOTTOMLEFT", 0, -4)
 	routeScroll:SetPoint("RIGHT", frame, "RIGHT", -38, 0)
 	routeScroll:SetHeight(ROUTE_ROWS * ROW_HEIGHT)
@@ -755,7 +755,7 @@ local function CreateMainFrame()
 
 	matLabel = Label(frame, L["Materials for the rest of the route"], "GameFontNormal")
 	matLabel:SetPoint("TOPLEFT", routeLabel, "BOTTOMLEFT", 0, -(ROUTE_ROWS * ROW_HEIGHT + 16))
-	matScroll = CreateFrame("ScrollFrame", "SkillPathMatScroll", frame, "FauxScrollFrameTemplate")
+	matScroll = CreateFrame("ScrollFrame", "ProfessionPathMatScroll", frame, "FauxScrollFrameTemplate")
 	matScroll:SetPoint("TOPLEFT", matLabel, "BOTTOMLEFT", 0, -4)
 	matScroll:SetPoint("RIGHT", frame, "RIGHT", -38, 0)
 	matScroll:SetHeight(MAT_ROWS * ROW_HEIGHT)
@@ -832,7 +832,7 @@ local function CreateMainFrame()
 	priceLabel:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -20, 16)
 
 	frame:SetScript("OnShow", function()
-		vendorCheck:SetChecked(SkillPathDB.options.vendorRecipes)
+		vendorCheck:SetChecked(ProfessionPathDB.options.vendorRecipes)
 		SP:ClearPrices()
 		SP:Refresh()
 		SP:UpdateTradeSkillTab()
@@ -878,7 +878,7 @@ function SP:Toggle()
 end
 
 -- Profession window --------------------------------------------------------------------
--- Tabs on the right edge (like the skill line tabs of the spellbook): SkillPath itself and
+-- Tabs on the right edge (like the skill line tabs of the spellbook): ProfessionPath itself and
 -- "select the recommended recipe". The recommended recipe is also marked in the list.
 
 local TAB_ICON = "Interface\\Icons\\INV_Scroll_06" -- scroll with quill: a written guide
@@ -970,7 +970,7 @@ function SP:Recommended()
 	if not line or (SP.Gather and SP.Gather.IsGather(line)) or not skill or skill <= 0 then
 		return nil
 	end
-	local key = line .. ":" .. skill .. ":" .. SP.recommendVersion .. ":" .. tostring(SkillPathDB.options.vendorRecipes)
+	local key = line .. ":" .. skill .. ":" .. SP.recommendVersion .. ":" .. tostring(ProfessionPathDB.options.vendorRecipes)
 	if key ~= recommendKey then
 		recommendKey, recommendCache = key, false
 		local route = StepAt(SP:Plan(line, skill), skill)
@@ -1018,7 +1018,7 @@ local function ShowMarkTooltip(mark)
 		return
 	end
 	GameTooltip:SetOwner(mark, "ANCHOR_RIGHT")
-	GameTooltip:SetText(L["Recommended by SkillPath"])
+	GameTooltip:SetText(L["Recommended by ProfessionPath"])
 	GameTooltip:AddLine(format(L["About %d more crafts up to skill %d."], rec.crafts, rec.to), 1, 1, 1)
 	AddPlannedLines(rec)
 	GameTooltip:Show()
@@ -1030,7 +1030,7 @@ local function UpdateTradeSkillMarks()
 	for i = 1, TRADE_SKILLS_DISPLAYED or 8 do
 		local button = _G["TradeSkillSkill" .. i]
 		if button then
-			local mark = button.skillPathMark
+			local mark = button.professionPathMark
 			if not mark then
 				mark = CreateFrame("Button", nil, button)
 				mark:SetWidth(14)
@@ -1043,7 +1043,7 @@ local function UpdateTradeSkillMarks()
 				mark:SetScript("OnLeave", function()
 					GameTooltip:Hide()
 				end)
-				button.skillPathMark = mark
+				button.professionPathMark = mark
 			end
 			local index = button:IsShown() and button:GetID()
 			if rec and rec.spell and index and index > 0 and RecipeSpell(index) == rec.spell then
@@ -1094,7 +1094,7 @@ end
 local function SelectRecommended()
 	local rec = SP:Recommended()
 	if not rec then
-		UIErrorsFrame:AddMessage(L["SkillPath has no recommendation for this profession at your skill."], 1, 0.82, 0)
+		UIErrorsFrame:AddMessage(L["ProfessionPath has no recommendation for this profession at your skill."], 1, 0.82, 0)
 		return
 	end
 	if not rec.spell then
@@ -1127,7 +1127,7 @@ function SP:AttachTradeSkillButton()
 	if SP.tradeSkillTab or not TradeSkillFrame then
 		return
 	end
-	local tab = CreateTab("SkillPathTradeSkillTab", TAB_ICON, true)
+	local tab = CreateTab("ProfessionPathTradeSkillTab", TAB_ICON, true)
 	tab:SetScript("OnClick", function()
 		if frame and frame:IsShown() then
 			frame:Hide()
@@ -1139,13 +1139,13 @@ function SP:AttachTradeSkillButton()
 	end)
 	tab:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		GameTooltip:SetText("SkillPath")
-		GameTooltip:AddLine(L["Opens SkillPath for this profession."], 1, 1, 1)
+		GameTooltip:SetText("ProfessionPath")
+		GameTooltip:AddLine(L["Opens ProfessionPath for this profession."], 1, 1, 1)
 		GameTooltip:Show()
 	end)
 	SP.tradeSkillTab = tab
 
-	local selectTab = CreateTab("SkillPathSelectTab", SELECT_ICON, false)
+	local selectTab = CreateTab("ProfessionPathSelectTab", SELECT_ICON, false)
 	selectTab:SetScript("OnClick", SelectRecommended)
 	selectTab:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
@@ -1157,7 +1157,7 @@ function SP:AttachTradeSkillButton()
 		if rec then
 			AddPlannedLines(rec)
 		end
-		GameTooltip:AddLine(L["Selects the recipe SkillPath recommends at your skill and enters the number of crafts."], 0.7, 0.7, 0.7, true)
+		GameTooltip:AddLine(L["Selects the recipe ProfessionPath recommends at your skill and enters the number of crafts."], 0.7, 0.7, 0.7, true)
 		GameTooltip:Show()
 	end)
 	SP.selectTab = selectTab

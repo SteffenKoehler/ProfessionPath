@@ -1,9 +1,9 @@
--- SkillPath route planner. Pure logic without WoW API calls, so it can be tested outside
+-- ProfessionPath route planner. Pure logic without WoW API calls, so it can be tested outside
 -- the game: everything client-specific comes in through the options table.
 
-SkillPath = SkillPath or {}
+ProfessionPath = ProfessionPath or {}
 local Planner = {}
-SkillPath.Planner = Planner
+ProfessionPath.Planner = Planner
 
 -- recipe fields (see Data.lua)
 local SPELL, SOURCE, LEARN, YELLOW, GREY, COST, RACE, ABILITY, CREATED, AMOUNT, REAGENTS = 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11
@@ -26,7 +26,7 @@ Planner.ESTIMATE_FACTOR = 4
 local UNKNOWN_PRICE = 100 -- 1 silver for items without any price information
 
 -- Price estimate without auction data: vendor buy price for vendor reagents, otherwise a
--- multiple of the vendor sell price. data = SkillPathData.
+-- multiple of the vendor sell price. data = ProfessionPathData.
 function Planner.EstimatePrice(item, data)
 	local buy = data.vendor[item]
 	if buy then

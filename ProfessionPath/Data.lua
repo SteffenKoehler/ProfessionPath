@@ -4,7 +4,7 @@
 -- recipe = {spell, source (1 auto, 2 trainer, 3 other, 4 vendor recipe), learn, yellow, grey,
 --           trainer cost, race mask, required ability, created item, amount, reagent, count, ...}
 -- vendor = buy price of vendor reagents, sellPrice = vendor sell price of other reagents
-SkillPathData = {
+ProfessionPathData = {
 	skills = {
 		[129] = 3273,
 		[164] = 2018,
