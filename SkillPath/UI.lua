@@ -876,7 +876,8 @@ function SP:Toggle()
 end
 
 -- Tab on the right edge of the profession window, like the skill line tabs of the spellbook
-local TAB_ICON = "Interface\\Icons\\INV_Misc_Map_01"
+-- scroll with quill: a written guide
+local TAB_ICON = "Interface\\Icons\\INV_Scroll_06"
 
 -- Skins like ElvUI replace the window art with a backdrop: then the tab sits right at the
 -- backdrop's edge and gets a plain border instead of the spellbook tab art.

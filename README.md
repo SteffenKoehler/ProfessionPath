@@ -36,7 +36,7 @@ cost, from the recipes you can actually get.
 
 ## Usage
 
-- `/skillpath` or `/spath` toggles the window, or click the map tab on the right edge of
+- `/skillpath` or `/spath` toggles the window, or click the scroll tab on the right edge of
   the profession window (like the tabs of the spellbook).
 - Open each profession window once, so SkillPath knows the recipes you already have.
 
