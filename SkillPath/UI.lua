@@ -1037,9 +1037,8 @@ local function UpdateTradeSkillMarks()
 				mark:SetHeight(14)
 				mark:SetPoint("RIGHT", button, "RIGHT", -2, 0)
 				mark:SetFrameLevel(button:GetFrameLevel() + 2)
-				local icon = mark:CreateTexture(nil, "OVERLAY")
-				icon:SetAllPoints()
-				icon:SetTexture(MARK_ICON)
+				mark.icon = mark:CreateTexture(nil, "OVERLAY")
+				mark.icon:SetAllPoints()
 				mark:SetScript("OnEnter", ShowMarkTooltip)
 				mark:SetScript("OnLeave", function()
 					GameTooltip:Hide()
@@ -1048,6 +1047,9 @@ local function UpdateTradeSkillMarks()
 			end
 			local index = button:IsShown() and button:GetID()
 			if rec and rec.spell and index and index > 0 and RecipeSpell(index) == rec.spell then
+				-- a substitute shows where the planned recipe comes from (trainer book, vendor bag)
+				local icon = rec.substitute and SOURCE_ICONS[rec.planned[F.SOURCE]] or MARK_ICON
+				mark.icon:SetTexture(icon)
 				mark:Show()
 			else
 				mark:Hide()

@@ -133,3 +133,7 @@ assert(sub.spell == 2402 and sub.substitute, "best known recipe instead of the u
 SP.selectTab:GetScript("OnClick")()
 SP.selectTab:GetScript("OnEnter")(SP.selectTab)
 print("substitute ok")
+
+-- marks with substitute: the hook runs with a substitute recommendation
+hooks.TradeSkillFrame_Update()
+print("marks with substitute ok")
