@@ -215,9 +215,16 @@ function SP:PriceSource()
 end
 
 -- Age of the auction data in seconds (nil if unknown) and whether the last scan was a
--- partial one (a search, not a full scan). Only Auctioneer stores scan times.
+-- partial one (a search, not a full scan). Auctioneer stores every scan; Auctionator
+-- (2.6.x for 3.3.5) only the end of its last full scan, in AUCTIONATOR_LAST_SCAN_TIME.
 function SP:ScanAge()
-	if not (AucAdvanced and AucAdvanced.API and AucAdvanced.API.GetScanStats) then
+	if not (AucAdvanced and AucAdvanced.API and AucAdvanced.API.GetMarketValue) then
+		if Atr_GetAuctionBuyout and type(AUCTIONATOR_LAST_SCAN_TIME) == "number" then
+			return math.max(0, time() - AUCTIONATOR_LAST_SCAN_TIME), false
+		end
+		return nil
+	end
+	if not AucAdvanced.API.GetScanStats then
 		return nil
 	end
 	local ok, stats = pcall(AucAdvanced.API.GetScanStats)
