@@ -593,6 +593,23 @@ local function UpdateMaterials()
 	else
 		allCheck:Hide()
 	end
+	if source then
+		-- how old the auction data is: grey up to a day, yellow up to 3 days, then orange
+		local age, partial = SP:ScanAge()
+		if age then
+			local when
+			if age < 3600 then
+				when = format(L["%d min"], math.max(1, math.floor(age / 60)))
+			elseif age < 2 * 86400 then
+				when = format(L["%d h"], math.floor(age / 3600))
+			else
+				when = format(L["%d days"], math.floor(age / 86400))
+			end
+			local color = age <= 86400 and "" or (age <= 3 * 86400 and "|cffffd100" or "|cffff8040")
+			source = format("%s, %s%s%s", source, color, format(L["scan %s ago"], when),
+				partial and (" " .. L["(partial)"]) or "") .. (color ~= "" and "|r" or "")
+		end
+	end
 	priceLabel:SetText(format(L["Prices: %s"], source or L["estimate from vendor prices"]))
 end
 

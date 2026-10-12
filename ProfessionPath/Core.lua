@@ -214,6 +214,20 @@ function SP:PriceSource()
 	end
 end
 
+-- Age of the auction data in seconds (nil if unknown) and whether the last scan was a
+-- partial one (a search, not a full scan). Only Auctioneer stores scan times.
+function SP:ScanAge()
+	if not (AucAdvanced and AucAdvanced.API and AucAdvanced.API.GetScanStats) then
+		return nil
+	end
+	local ok, stats = pcall(AucAdvanced.API.GetScanStats)
+	if not ok or type(stats) ~= "table" or not stats.LastScan then
+		return nil
+	end
+	local partial = not stats.LastFullScan or stats.LastFullScan < stats.LastScan - 3600
+	return math.max(0, time() - stats.LastScan), partial
+end
+
 local function AuctionPrice(item)
 	local link = select(2, GetItemInfo(item))
 	if not link then
