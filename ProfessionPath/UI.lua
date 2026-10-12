@@ -18,9 +18,10 @@ local routeRows, matRows = {}, {}
 local entries, materials = {}, {}
 local materialTotal = 0
 local fullTotal -- cost up to SP.MAX_SKILL, nil when the list already covers the whole route
-local stageTo = 0 -- materials are listed up to this skill
+local stageTo = 0 -- current rank cap (or the next one when capped)
+local listTo = 0 -- materials are listed up to this skill
 local fullTo = 0 -- end of the route (fullTotal)
-local matLabel, priceLabel, hintLabel
+local matLabel, priceLabel, hintLabel, allCheck, allCheckText
 local AVOID_ICON = "Interface\\Buttons\\UI-GroupLoot-Pass-Up"
 -- undo arrow of the equipment manager (exists in 3.3.5)
 local USE_AGAIN_ICON = "Interface\\PaperDollInfoFrame\\UI-GearManager-Undo"
@@ -350,13 +351,15 @@ local function Build()
 	-- The list covers the route up to the current rank cap (or the next one when capped);
 	-- a step crossing the cap counts only its part below it. The cost up to 450 is shown
 	-- separately in the label.
+	-- The checkbox next to the label switches to the whole route.
 	stageTo = maxRank > rank and maxRank or math.min(SP.MAX_SKILL, (math.floor(rank / 75) + 1) * 75)
+	listTo = ProfessionPathDB.options.allMaterials and reached or stageTo
 	local stage = {}
 	for _, step in ipairs(steps) do
-		if step.from < stageTo then
-			if step.to > stageTo then
-				step = {from = step.from, to = stageTo, recipe = step.recipe,
-					crafts = math.ceil(step.crafts * (stageTo - step.from) / (step.to - step.from))}
+		if step.from < listTo then
+			if step.to > listTo then
+				step = {from = step.from, to = listTo, recipe = step.recipe,
+					crafts = math.ceil(step.crafts * (listTo - step.from) / (step.to - step.from))}
 			end
 			stage[#stage + 1] = step
 		end
@@ -399,7 +402,7 @@ local function Build()
 		return a.need > b.need
 	end)
 	materialTotal = Cost(need)
-	fullTotal = stageTo < reached and Cost(Planner.Materials(steps, rank)) or nil
+	fullTotal = stageTo < reached and (listTo == reached and materialTotal or Cost(Planner.Materials(steps, rank))) or nil
 	fullTo = reached
 	-- Avoided materials the route no longer needs stay listed (so they can be used again)
 	-- while a recipe of this profession that still gives points uses them; once all of
@@ -571,18 +574,23 @@ local function UpdateMaterials()
 		priceLabel:SetText("")
 		hintLabel:SetText("")
 		vendorCheck:Hide()
+		allCheck:Hide()
 		return
 	end
 	hintLabel:SetText(#materials > 0 and L["X: avoid a material"] or "")
 	vendorCheck:Show()
 	local source = SP:PriceSource()
-	local text = format("%s  |cffffffff~%s|r", format(L["Materials up to skill %d"], stageTo),
-		GetCoinTextureString(math.floor(materialTotal / 100) * 100))
+	matLabel:SetText(format("%s  |cffffffff~%s|r", format(L["Materials up to skill %d"], listTo),
+		GetCoinTextureString(math.floor(materialTotal / 100) * 100)))
 	if fullTotal then
-		text = format("%s   |cff808080%s ~|r%s", text, format(L["up to %d:"], fullTo),
-			GetCoinTextureString(math.floor(fullTotal / 10000) * 10000))
+		local all = ProfessionPathDB.options.allMaterials
+		allCheck:SetChecked(all)
+		allCheckText:SetText(all and format(L["up to %d"], fullTo) or format("%s ~%s", format(L["up to %d:"], fullTo),
+			GetCoinTextureString(math.floor(fullTotal / 10000) * 10000)))
+		allCheck:Show()
+	else
+		allCheck:Hide()
 	end
-	matLabel:SetText(text)
 	priceLabel:SetText(format(L["Prices: %s"], source or L["estimate from vendor prices"]))
 end
 
@@ -799,6 +807,26 @@ local function CreateMainFrame()
 
 	matLabel = Label(frame, L["Materials for the rest of the route"], "GameFontNormal")
 	matLabel:SetPoint("TOPLEFT", routeLabel, "BOTTOMLEFT", 0, -(ROUTE_ROWS * ROW_HEIGHT + 16))
+	-- checkbox behind the label: list materials for the whole route instead of up to the rank cap
+	allCheck = CreateFrame("CheckButton", "ProfessionPathAllCheck", frame, "UICheckButtonTemplate")
+	allCheck:SetWidth(20)
+	allCheck:SetHeight(20)
+	allCheck:SetPoint("LEFT", matLabel, "RIGHT", 6, 0)
+	allCheckText = _G["ProfessionPathAllCheckText"]
+	allCheckText:SetFontObject("GameFontDisable")
+	allCheck:SetScript("OnClick", function(self)
+		ProfessionPathDB.options.allMaterials = self:GetChecked() and true or false
+		SP:Refresh()
+	end)
+	allCheck:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		GameTooltip:SetText(L["List the materials for the whole route instead of up to your current rank."], nil, nil, nil, nil, true)
+		GameTooltip:Show()
+	end)
+	allCheck:SetScript("OnLeave", function()
+		GameTooltip:Hide()
+	end)
+	allCheck:Hide()
 	matScroll = CreateFrame("ScrollFrame", "ProfessionPathMatScroll", frame, "FauxScrollFrameTemplate")
 	matScroll:SetPoint("TOPLEFT", matLabel, "BOTTOMLEFT", 0, -4)
 	matScroll:SetPoint("RIGHT", frame, "RIGHT", -38, 0)
