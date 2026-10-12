@@ -17,6 +17,9 @@ local frame, routeScroll, matScroll, dropdown, status, vendorCheck
 local routeRows, matRows = {}, {}
 local entries, materials = {}, {}
 local materialTotal = 0
+local fullTotal -- cost up to SP.MAX_SKILL, nil when the list already covers the whole route
+local stageTo = 0 -- materials are listed up to this skill
+local fullTo = 0 -- end of the route (fullTotal)
 local matLabel, priceLabel, hintLabel
 local AVOID_ICON = "Interface\\Buttons\\UI-GroupLoot-Pass-Up"
 -- undo arrow of the equipment manager (exists in 3.3.5)
@@ -289,6 +292,7 @@ end
 local function Build()
 	wipe(entries)
 	wipe(materials)
+	materialTotal, fullTotal = 0, nil
 	SP.missingNames = 0
 	if not selected then
 		return
@@ -343,30 +347,60 @@ local function Build()
 		end
 	end
 
-	local total = 0
-	local usedBy = {}
+	-- The list covers the route up to the current rank cap (or the next one when capped);
+	-- a step crossing the cap counts only its part below it. The cost up to 450 is shown
+	-- separately in the label.
+	stageTo = maxRank > rank and maxRank or math.min(SP.MAX_SKILL, (math.floor(rank / 75) + 1) * 75)
+	local stage = {}
 	for _, step in ipairs(steps) do
+		if step.from < stageTo then
+			if step.to > stageTo then
+				step = {from = step.from, to = stageTo, recipe = step.recipe,
+					crafts = math.ceil(step.crafts * (stageTo - step.from) / (step.to - step.from))}
+			end
+			stage[#stage + 1] = step
+		end
+	end
+	local function Cost(need)
+		local sum = 0
+		for item, count in pairs(need) do
+			local have = GetItemCount(item, true)
+			-- avoided materials the route still needs are bought too, at market price
+			if have < count then
+				sum = sum + (count - have) * SP:Price(item)
+			end
+		end
+		return sum
+	end
+
+	-- first step using a material, so the list follows the route
+	local usedBy, firstUse = {}, {}
+	for index, step in ipairs(stage) do
 		if step.to > rank then
 			local r = step.recipe
 			for i = F.REAGENTS, #r, 2 do
 				usedBy[r[i]] = usedBy[r[i]] or {}
 				table.insert(usedBy[r[i]], step)
+				firstUse[r[i]] = firstUse[r[i]] or index
 			end
 		end
 	end
-	for item, count in pairs(Planner.Materials(steps, rank)) do
+	local need = Planner.Materials(stage, rank)
+	for item, count in pairs(need) do
 		if count > 0 then
-			local have = GetItemCount(item, true)
-			materials[#materials + 1] = {item = item, need = count, have = have, usedBy = usedBy[item]}
-			-- avoided materials the route still needs are bought too, at market price
-			if have < count then
-				total = total + (count - have) * SP:Price(item)
-			end
+			materials[#materials + 1] = {item = item, need = count, have = GetItemCount(item, true),
+				usedBy = usedBy[item], first = firstUse[item] or 0}
 		end
 	end
 	table.sort(materials, function(a, b)
+		if a.first ~= b.first then
+			return a.first < b.first
+		end
 		return a.need > b.need
 	end)
+	materialTotal = Cost(need)
+	fullTotal = stageTo < reached and Cost(Planner.Materials(steps, rank)) or nil
+	fullTo = reached
 	-- Avoided materials the route no longer needs stay listed (so they can be used again)
 	-- while a recipe of this profession that still gives points uses them; once all of
 	-- those are grey, they drop out of the list but stay avoided.
@@ -388,7 +422,6 @@ local function Build()
 			materials[#materials + 1] = {item = item, need = 0, have = GetItemCount(item, true)}
 		end
 	end
-	materialTotal = total
 end
 
 local function UpdateRoute()
@@ -543,8 +576,13 @@ local function UpdateMaterials()
 	hintLabel:SetText(#materials > 0 and L["X: avoid a material"] or "")
 	vendorCheck:Show()
 	local source = SP:PriceSource()
-	matLabel:SetText(format("%s  |cffffffff~%s|r", L["Materials for the rest of the route"],
-		GetCoinTextureString(math.floor(materialTotal / 100) * 100)))
+	local text = format("%s  |cffffffff~%s|r", format(L["Materials up to skill %d"], stageTo),
+		GetCoinTextureString(math.floor(materialTotal / 100) * 100))
+	if fullTotal then
+		text = format("%s   |cff808080%s ~|r%s", text, format(L["up to %d:"], fullTo),
+			GetCoinTextureString(math.floor(fullTotal / 10000) * 10000))
+	end
+	matLabel:SetText(text)
 	priceLabel:SetText(format(L["Prices: %s"], source or L["estimate from vendor prices"]))
 end
 
