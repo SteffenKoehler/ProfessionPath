@@ -268,23 +268,47 @@ function Planner.Plan(recipes, from, to, opts)
 	return steps, s
 end
 
+local function RemainingCrafts(step, skill)
+	if skill >= step.to then
+		return 0
+	elseif skill > step.from then
+		return math.ceil(step.crafts * (step.to - skill) / (step.to - step.from))
+	end
+	return step.crafts
+end
+
 -- Materials for the remaining steps: {item = count}. Partially done first step counts from
--- the current skill.
+-- the current skill. What an earlier step makes (heavy leather, bolts) covers later needs.
 function Planner.Materials(steps, skill)
-	local need = {}
+	local need, made = {}, {}
 	for _, step in ipairs(steps) do
-		local crafts = step.crafts
-		if skill > step.from and skill < step.to then
-			crafts = math.ceil(crafts * (step.to - skill) / (step.to - step.from))
-		elseif skill >= step.to then
-			crafts = 0
-		end
+		local crafts = RemainingCrafts(step, skill)
 		local r = step.recipe
 		for i = REAGENTS, #r, 2 do
-			need[r[i]] = (need[r[i]] or 0) + r[i + 1] * crafts
+			local item, count = r[i], r[i + 1] * crafts
+			local fromMade = math.min(made[item] or 0, count)
+			made[item] = (made[item] or 0) - fromMade
+			need[item] = (need[item] or 0) + count - fromMade
+		end
+		if r[CREATED] > 0 then
+			made[r[CREATED]] = (made[r[CREATED]] or 0) + r[AMOUNT] * crafts
 		end
 	end
 	return need
+end
+
+-- What the rest of a route really costs: materials to buy at opts.price, own materials
+-- (`have`) at opts.ownPrice, plus the effort per craft. Used to compare routes.
+function Planner.RouteCost(steps, skill, have, opts)
+	local cost = 0
+	for item, count in pairs(Planner.Materials(steps, skill)) do
+		local own = math.min(have[item] or 0, count)
+		cost = cost + own * opts.ownPrice(item) + (count - own) * opts.price(item)
+	end
+	for _, step in ipairs(steps) do
+		cost = cost + RemainingCrafts(step, skill) * Planner.CRAFT_EFFORT
+	end
+	return cost
 end
 
 Planner.FIELDS = {SPELL = SPELL, SOURCE = SOURCE, LEARN = LEARN, YELLOW = YELLOW, GREY = GREY, COST = COST,

@@ -153,34 +153,48 @@ function SP:Plan(line, from, onlyKnown, to)
 		end,
 		onlyKnown = onlyKnown,
 	}
-	-- Materials in bags and bank cost only their vendor sell price (what the player would
-	-- get for them otherwise), as long as the route has not used them up.
-	if ProfessionPathDB.options.ownMaterials then
-		local stock = {}
-		for _, r in ipairs(recipes) do
-			for i = F.REAGENTS, #r, 2 do
-				local item = r[i]
-				if stock[item] == nil then
-					stock[item] = GetItemCount(item, true) or 0
-				end
-			end
-			local created = r[F.CREATED]
-			if created > 0 and stock[created] == nil then
-				stock[created] = GetItemCount(created, true) or 0
+	from, to = math.max(1, from or 1), to or SP.MAX_SKILL
+	if not ProfessionPathDB.options.ownMaterials then
+		return Planner.Plan(recipes, from, to, opts)
+	end
+	-- Own materials: materials in bags and bank cost only their vendor sell price (what the
+	-- player would get for them otherwise) while the route has not used them up. That route
+	-- is planned skill point by skill point and can spend the stock on early recipes although
+	-- the normal route would have used it later anyway, so both routes are compared by what
+	-- they really cost and the cheaper one wins.
+	local have = {}
+	for _, r in ipairs(recipes) do
+		for i = F.REAGENTS, #r, 2 do
+			local item = r[i]
+			if have[item] == nil then
+				have[item] = GetItemCount(item, true) or 0
 			end
 		end
-		opts.stock = stock
-		opts.ownPrice = function(item)
-			-- avoided stays avoided, even when the player has it
-			if self:IsAvoided(item, line) then
-				return AVOID_PRICE
-			end
-			local market = opts.price(item)
-			local sell = Data.sellPrice and Data.sellPrice[item] or 0
-			return math.min(market, sell)
+		local created = r[F.CREATED]
+		if created > 0 and have[created] == nil then
+			have[created] = GetItemCount(created, true) or 0
 		end
 	end
-	return Planner.Plan(recipes, math.max(1, from or 1), to or SP.MAX_SKILL, opts)
+	opts.ownPrice = function(item)
+		-- avoided stays avoided, even when the player has it
+		if self:IsAvoided(item, line) then
+			return AVOID_PRICE
+		end
+		local sell = Data.sellPrice and Data.sellPrice[item] or 0
+		return math.min(opts.price(item), sell)
+	end
+	local steps, reached = Planner.Plan(recipes, from, to, opts)
+	local stock = {}
+	for item, count in pairs(have) do
+		stock[item] = count
+	end
+	opts.stock = stock
+	local ownSteps, ownReached = Planner.Plan(recipes, from, to, opts)
+	opts.stock = nil
+	if ownReached >= reached and Planner.RouteCost(ownSteps, from, have, opts) < Planner.RouteCost(steps, from, have, opts) then
+		return ownSteps, ownReached
+	end
+	return steps, reached
 end
 
 -- Prices --------------------------------------------------------------------------------
