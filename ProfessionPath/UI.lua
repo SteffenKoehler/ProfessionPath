@@ -13,7 +13,7 @@ local ROW_HEIGHT = 18
 local ROUTE_ROWS, MAT_ROWS = 13, 7
 local COLORS = {orange = "ff8040", yellow = "ffff00", green = "40bf40", grey = "808080"}
 
-local frame, routeScroll, matScroll, dropdown, status, vendorCheck
+local frame, routeScroll, matScroll, dropdown, status, vendorCheck, ownCheck
 local routeRows, matRows = {}, {}
 local entries, materials = {}, {}
 local materialTotal = 0
@@ -574,11 +574,13 @@ local function UpdateMaterials()
 		priceLabel:SetText("")
 		hintLabel:SetText("")
 		vendorCheck:Hide()
+		ownCheck:Hide()
 		allCheck:Hide()
 		return
 	end
 	hintLabel:SetText(#materials > 0 and L["X: avoid a material"] or "")
 	vendorCheck:Show()
+	ownCheck:Show()
 	local source = SP:PriceSource()
 	matLabel:SetText(format("%s  |cffffffff~%s|r", format(L["Materials up to skill %d"], listTo),
 		GetCoinTextureString(math.floor(materialTotal / 100) * 100)))
@@ -776,6 +778,24 @@ local function CreateMainFrame()
 		GameTooltip:Hide()
 	end)
 
+	ownCheck = CreateFrame("CheckButton", "ProfessionPathOwnCheck", frame, "UICheckButtonTemplate")
+	ownCheck:SetWidth(24)
+	ownCheck:SetHeight(24)
+	ownCheck:SetPoint("LEFT", _G["ProfessionPathVendorCheckText"], "RIGHT", 16, 0)
+	_G["ProfessionPathOwnCheckText"]:SetText(L["Prefer own materials"])
+	ownCheck:SetScript("OnClick", function(self)
+		ProfessionPathDB.options.ownMaterials = self:GetChecked() and true or false
+		SP:Refresh()
+	end)
+	ownCheck:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		GameTooltip:SetText(L["Materials in your bags and bank count only with their vendor sell price, so the route uses them first."], nil, nil, nil, nil, true)
+		GameTooltip:Show()
+	end)
+	ownCheck:SetScript("OnLeave", function()
+		GameTooltip:Hide()
+	end)
+
 	local routeLabel = Label(frame, L["Route"], "GameFontNormal")
 	routeLabel:SetPoint("TOPLEFT", 22, -102)
 	routeScroll = CreateFrame("ScrollFrame", "ProfessionPathRouteScroll", frame, "FauxScrollFrameTemplate")
@@ -905,6 +925,7 @@ local function CreateMainFrame()
 
 	frame:SetScript("OnShow", function()
 		vendorCheck:SetChecked(ProfessionPathDB.options.vendorRecipes)
+		ownCheck:SetChecked(ProfessionPathDB.options.ownMaterials)
 		SP:ClearPrices()
 		SP:Refresh()
 		SP:UpdateTradeSkillTab()

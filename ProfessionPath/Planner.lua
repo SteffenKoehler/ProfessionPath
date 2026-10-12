@@ -79,6 +79,16 @@ end
 -- Material cost of one craft in copper. opts.price(item) gives the price of a material;
 -- intermediates of this profession (bolts of cloth, bars ...) cost the cheaper of their
 -- price and their own materials.
+-- Price of a material at this point of the route: what the player still has (opts.stock,
+-- used up along the route) costs only opts.ownPrice(item), e.g. its vendor sell price.
+local function UnitPrice(item, opts)
+	local stock = opts.stock
+	if stock and (stock[item] or 0) > 0 then
+		return opts.ownPrice(item)
+	end
+	return opts.price(item)
+end
+
 local function CraftCost(recipe, opts, makers, cache, depth)
 	local cached = cache[recipe]
 	if cached then
@@ -87,7 +97,7 @@ local function CraftCost(recipe, opts, makers, cache, depth)
 	local cost = 0
 	for i = REAGENTS, #recipe, 2 do
 		local item, count = recipe[i], recipe[i + 1]
-		local price = opts.price(item)
+		local price = UnitPrice(item, opts)
 		local maker = makers[item]
 		if maker and maker ~= recipe and depth < 3 then
 			local own = CraftCost(maker, opts, makers, cache, depth + 1) / maker[AMOUNT]
@@ -99,6 +109,62 @@ local function CraftCost(recipe, opts, makers, cache, depth)
 	end
 	cache[recipe] = cost
 	return cost
+end
+
+-- Takes the materials of `crafts` crafts out of opts.stock. What is not in stock and is
+-- cheaper to make (as in CraftCost) uses up the materials of the intermediate instead.
+-- Returns true when a material ran out, so cached craft costs are outdated.
+local function Consume(recipe, crafts, opts, makers, cache, depth)
+	local stock = opts.stock
+	local ranOut = false
+	for i = REAGENTS, #recipe, 2 do
+		local item = recipe[i]
+		local need = recipe[i + 1] * crafts
+		local have = stock[item] or 0
+		if have > 0 then
+			local used = math.min(have, need)
+			stock[item] = have - used
+			need = need - used
+			ranOut = ranOut or stock[item] <= 0
+		end
+		local maker = makers[item]
+		if need > 0 and maker and maker ~= recipe and depth < 3
+			and CraftCost(maker, opts, makers, cache, depth + 1) / maker[AMOUNT] < opts.price(item) then
+			ranOut = Consume(maker, need / maker[AMOUNT], opts, makers, cache, depth + 1) or ranOut
+		end
+	end
+	-- what a skill-up craft makes is the player's own material afterwards (heavy leather
+	-- for armor kits, bolts for tailoring)
+	local created = recipe[CREATED]
+	if depth == 0 and created > 0 then
+		if (stock[created] or 0) <= 0 then
+			ranOut = true -- price of the created item changes too
+		end
+		stock[created] = (stock[created] or 0) + recipe[AMOUNT] * crafts
+	end
+	return ranOut
+end
+
+-- A short step between two steps of the same recipe (switched there because of rounding
+-- or a material running out) is merged into them when that recipe still gives points.
+local MERGE_POINTS = 2
+local function MergeShortSteps(steps)
+	local i = 2
+	while i < #steps do
+		local prev, step, nextStep = steps[i - 1], steps[i], steps[i + 1]
+		local r = prev.recipe
+		if nextStep.recipe == r and step.to - step.from <= MERGE_POINTS and Planner.Chance(r, step.to - 1) > 0 then
+			local expected = 0
+			for s = prev.from, nextStep.to - 1 do
+				expected = expected + 1 / Planner.Chance(r, s)
+			end
+			prev.to, prev.crafts = nextStep.to, math.ceil(expected - 0.05)
+			table.remove(steps, i + 1)
+			table.remove(steps, i)
+		else
+			i = i + 1
+		end
+	end
 end
 
 -- Can the player use this recipe at skill s?
@@ -138,7 +204,8 @@ end
 
 -- Plan from skill `from` to `to`. opts: price(item) in copper (required), cooldown (set of
 -- spells to skip), known (set of spells), vendorRecipes (allow recipes bought from vendors),
--- raceBit, hasAbility(spell). Returns steps {recipe, from, to, crafts} and the end skill
+-- raceBit, hasAbility(spell), stock ({item = count}, changed while planning) with
+-- ownPrice(item) for owned materials. Returns steps {recipe, from, to, crafts} and the end skill
 -- (lower than `to` if no usable recipe gives points any more).
 function Planner.Plan(recipes, from, to, opts)
 	local makers = MakerIndex(recipes)
@@ -184,13 +251,20 @@ function Planner.Plan(recipes, from, to, opts)
 			current = best
 			expected = 0
 		end
-		expected = expected + 1 / Planner.Chance(best, s)
+		local crafts = 1 / Planner.Chance(best, s)
+		expected = expected + crafts
+		if opts.stock and Consume(best, crafts, opts, makers, cache, 0) then
+			for k in pairs(cache) do
+				cache[k] = nil
+			end
+		end
 		s = s + 1
 		step.to = s
 	end
 	if step then
 		step.crafts = math.ceil(expected - 0.05)
 	end
+	MergeShortSteps(steps)
 	return steps, s
 end
 

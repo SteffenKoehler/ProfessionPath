@@ -89,7 +89,7 @@ def main():
     lua.execute(STUBS)
     for f in ("Locales.lua", "Data.lua", "Planner.lua", "GatherData.lua", "Gather.lua", "Core.lua", "UI.lua"):
         lua.execute(open(os.path.join(ADDON, f), encoding="utf-8").read())
-    lua.execute("ProfessionPathDB = {chars = {}, options = {vendorRecipes = true}, avoided = {}}")
+    lua.execute("ProfessionPathDB = {chars = {}, options = {vendorRecipes = true, ownMaterials = true}, avoided = {}}")
     lua.execute(open(os.path.join(HERE, "smoke_body.lua"), encoding="utf-8").read())
     print("smoke test passed")
 

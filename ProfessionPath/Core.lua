@@ -153,6 +153,33 @@ function SP:Plan(line, from, onlyKnown, to)
 		end,
 		onlyKnown = onlyKnown,
 	}
+	-- Materials in bags and bank cost only their vendor sell price (what the player would
+	-- get for them otherwise), as long as the route has not used them up.
+	if ProfessionPathDB.options.ownMaterials then
+		local stock = {}
+		for _, r in ipairs(recipes) do
+			for i = F.REAGENTS, #r, 2 do
+				local item = r[i]
+				if stock[item] == nil then
+					stock[item] = GetItemCount(item, true) or 0
+				end
+			end
+			local created = r[F.CREATED]
+			if created > 0 and stock[created] == nil then
+				stock[created] = GetItemCount(created, true) or 0
+			end
+		end
+		opts.stock = stock
+		opts.ownPrice = function(item)
+			-- avoided stays avoided, even when the player has it
+			if self:IsAvoided(item, line) then
+				return AVOID_PRICE
+			end
+			local market = opts.price(item)
+			local sell = Data.sellPrice and Data.sellPrice[item] or 0
+			return math.min(market, sell)
+		end
+	end
 	return Planner.Plan(recipes, math.max(1, from or 1), to or SP.MAX_SKILL, opts)
 end
 
@@ -302,6 +329,9 @@ events:SetScript("OnEvent", function(_, event, arg1)
 			ProfessionPathDB.avoided = ProfessionPathDB.avoided or {}
 			if ProfessionPathDB.options.vendorRecipes == nil then
 				ProfessionPathDB.options.vendorRecipes = true
+			end
+			if ProfessionPathDB.options.ownMaterials == nil then
+				ProfessionPathDB.options.ownMaterials = true
 			end
 		elseif arg1 == "Blizzard_TradeSkillUI" and SP.AttachTradeSkillButton then
 			SP:AttachTradeSkillButton()
