@@ -43,6 +43,7 @@ local translations = {
 		["Prices: %s"] = "Preise: %s",
 		["estimate from vendor prices"] = "Schätzung aus Händlerpreisen",
 		["scan %s ago"] = "Scan vor %s",
+		["%d new entries learned from this vendor or trainer."] = "%d neue Einträge von diesem Händler bzw. Lehrer übernommen.",
 		["(partial)"] = "(Teilscan)",
 		["%d min"] = "%d Min.",
 		["%d h"] = "%d Std.",

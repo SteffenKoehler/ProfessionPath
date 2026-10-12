@@ -137,3 +137,46 @@ print("substitute ok")
 -- marks with substitute: the hook runs with a substitute recommendation
 hooks.TradeSkillFrame_Update()
 print("marks with substitute ok")
+
+-- server data: what a vendor or trainer window shows is laid over Data
+do
+	local D, F = ProfessionPathData, ProfessionPath.Planner.FIELDS
+	local other, taught
+	for _, r in ipairs(D.recipes[165]) do
+		if r[F.SOURCE] == 3 then
+			if not other and D.recipeItem[r[F.SPELL]] then
+				other = r
+			elseif not taught then
+				taught = r
+			end
+		end
+	end
+	assert(other and taught and other ~= taught)
+	assert(not D.vendor[2319], "medium leather is no vendor reagent in Data")
+	local merchant = {{2319, 1000, 5}, {D.recipeItem[other[F.SPELL]], 5000, 1}, {2320, 0, 1}}
+	GetMerchantNumItems = function() return #merchant end
+	GetMerchantItemInfo = function(i) return "x", nil, merchant[i][2], merchant[i][3], -1, 1, nil end
+	GetMerchantItemLink = function(i) return "|cffffffff|Hitem:" .. merchant[i][1] .. ":0:0:0|h[x]|h|r" end
+	local frame = ProfessionPath.eventFrame
+	local onEvent = frame:GetScript("OnEvent")
+	onEvent(frame, "MERCHANT_SHOW")
+	assert(D.vendor[2319] == 200, "vendor price per unit")
+	assert(other[F.SOURCE] == 4, "recipe sold by the vendor")
+
+	GetNumTrainerServices = function() return 2 end
+	GetTrainerServiceInfo = function(i)
+		if i == 1 then
+			return "Header", nil, "header"
+		end
+		return GetSpellInfo(taught[F.SPELL]), nil, "available"
+	end
+	GetTrainerServiceSkillLine = function() return ProfessionPath.skillName[165] end
+	GetTrainerServiceItemLink = function() return nil end
+	GetTrainerServiceSkillReq = function() return "Leatherworking", 123, true end
+	GetTrainerServiceCost = function() return 4321 end
+	onEvent(frame, "TRAINER_SHOW")
+	assert(taught[F.SOURCE] == 2 and taught[F.LEARN] == 123 and taught[F.COST] == 4321, "trainer recipe")
+	assert(ProfessionPathDB.learned.Horde.trainer[taught[F.SPELL]][1] == 123, "saved per faction")
+	ProfessionPath:Refresh()
+	print("server data ok")
+end

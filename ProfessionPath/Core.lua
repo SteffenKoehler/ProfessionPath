@@ -180,8 +180,7 @@ function SP:Plan(line, from, onlyKnown, to)
 		if self:IsAvoided(item, line) then
 			return AVOID_PRICE
 		end
-		local sell = Data.sellPrice and Data.sellPrice[item] or 0
-		return math.min(opts.price(item), sell)
+		return math.min(opts.price(item), self:SellPrice(item))
 	end
 	local steps, reached = Planner.Plan(recipes, from, to, opts)
 	local stock = {}
@@ -266,11 +265,21 @@ function SP:Price(item)
 	if not price then
 		price, source = AuctionPrice(item), "auction"
 		if not price then
-			price, source = Planner.EstimatePrice(item, Data), "estimate"
+			local sell = SP:SellPrice(item)
+			price, source = sell > 0 and sell * Planner.ESTIMATE_FACTOR or Planner.EstimatePrice(item, Data), "estimate"
 		end
 	end
 	priceCache[item] = {price, source}
 	return price, source
+end
+
+-- Vendor sell price in copper as the server sends it (GetItemInfo), else from Data
+function SP:SellPrice(item)
+	local sell = select(11, GetItemInfo(item))
+	if type(sell) == "number" then
+		return sell
+	end
+	return Data.sellPrice[item] or 0
 end
 
 function SP:ClearPrices()
@@ -345,8 +354,171 @@ function SP:RecipeName(spell)
 	return name or ("spell:" .. spell), icon
 end
 
+-- Server data -----------------------------------------------------------------------------
+-- Data comes from AzerothCore (blizzlike); a server can differ. What it really offers is
+-- read while a vendor or trainer window is open, saved per faction (recipe vendors differ)
+-- and laid over Data: vendor prices of reagents, recipes sold by vendors, trainer recipes
+-- with their skill requirement and cost. Only what the server shows is added, nothing is
+-- removed (a trainer of a lower rank does not list everything).
+
+local reagentSet, recipeItemSpells, spellRecipe, recipeNames
+
+local function BuildIndexes()
+	if reagentSet then
+		return
+	end
+	reagentSet, recipeItemSpells, spellRecipe = {}, {}, {}
+	for _, recipes in pairs(Data.recipes) do
+		for _, r in ipairs(recipes) do
+			spellRecipe[r[F.SPELL]] = r
+			for i = F.REAGENTS, #r, 2 do
+				reagentSet[r[i]] = true
+			end
+		end
+	end
+	for spell, item in pairs(Data.recipeItem) do
+		recipeItemSpells[item] = recipeItemSpells[item] or {}
+		table.insert(recipeItemSpells[item], spell)
+	end
+end
+
+local function Learned()
+	local faction = UnitFactionGroup("player") or "Neutral"
+	ProfessionPathDB.learned = ProfessionPathDB.learned or {}
+	local db = ProfessionPathDB.learned
+	db[faction] = db[faction] or {vendor = {}, recipeVendor = {}, trainer = {}}
+	return db[faction]
+end
+
+function SP:ApplyLearned()
+	local learned = Learned()
+	for item, price in pairs(learned.vendor) do
+		Data.vendor[item] = price
+	end
+	for _, recipes in pairs(Data.recipes) do
+		for _, r in ipairs(recipes) do
+			local spell = r[F.SPELL]
+			local trainer = learned.trainer[spell]
+			if trainer and r[F.SOURCE] ~= Planner.SOURCE_AUTO then
+				r[F.SOURCE], r[F.LEARN], r[F.COST] = Planner.SOURCE_TRAINER, trainer[1], trainer[2]
+			elseif learned.recipeVendor[spell] and r[F.SOURCE] == Planner.SOURCE_OTHER then
+				r[F.SOURCE] = Planner.SOURCE_VENDOR
+			end
+		end
+	end
+end
+
+local function LearnedSomething(count)
+	SP:ApplyLearned()
+	SP:ClearPrices()
+	print(format("|cffffd100ProfessionPath:|r " .. L["%d new entries learned from this vendor or trainer."], count))
+	if SP.OnDataChanged then
+		SP:OnDataChanged()
+	end
+end
+
+local function ScanMerchant()
+	BuildIndexes()
+	local learned, changed = Learned(), 0
+	for i = 1, GetMerchantNumItems() do
+		local _, _, price, quantity, _, _, extendedCost = GetMerchantItemInfo(i)
+		local link = GetMerchantItemLink(i)
+		local item = link and tonumber(link:match("item:(%d+)"))
+		-- only plain gold purchases (no tokens or honor)
+		if item and price and price > 0 and not extendedCost then
+			if reagentSet[item] then
+				local unit = price / math.max(1, quantity or 1)
+				if learned.vendor[item] ~= unit then
+					if Data.vendor[item] ~= unit then
+						changed = changed + 1
+					end
+					learned.vendor[item] = unit
+				end
+			end
+			for _, spell in ipairs(recipeItemSpells[item] or {}) do
+				if not learned.recipeVendor[spell] then
+					learned.recipeVendor[spell] = true
+					local r = spellRecipe[spell]
+					if r and r[F.SOURCE] == Planner.SOURCE_OTHER then
+						changed = changed + 1
+					end
+				end
+			end
+		end
+	end
+	if changed > 0 then
+		LearnedSomething(changed)
+	end
+end
+
+-- Recipe of a trainer entry: same spell name, and if that is not unique, the same created item
+local function TrainerRecipe(line, name, link)
+	recipeNames = recipeNames or {}
+	if not recipeNames[line] then
+		local names = {}
+		for _, r in ipairs(Data.recipes[line] or {}) do
+			local spellName = GetSpellInfo(r[F.SPELL])
+			if spellName then
+				names[spellName] = names[spellName] or {}
+				table.insert(names[spellName], r)
+			end
+		end
+		recipeNames[line] = names
+	end
+	local list = recipeNames[line][name]
+	if not list then
+		return nil
+	elseif #list == 1 then
+		return list[1]
+	end
+	local item = link and tonumber(link:match("item:(%d+)"))
+	local found
+	for _, r in ipairs(list) do
+		if item and r[F.CREATED] == item then
+			if found then
+				return nil
+			end
+			found = r
+		end
+	end
+	return found
+end
+
+local function ScanTrainer()
+	if not (GetNumTrainerServices and GetTrainerServiceSkillLine) then
+		return
+	end
+	BuildIndexes()
+	local learned, changed = Learned(), 0
+	for i = 1, GetNumTrainerServices() do
+		local name, _, category = GetTrainerServiceInfo(i)
+		local line = name and category ~= "header" and SP.nameToSkill[GetTrainerServiceSkillLine(i) or ""]
+		local r = line and Data.recipes[line] and TrainerRecipe(line, name, GetTrainerServiceItemLink(i))
+		if r and r[F.SOURCE] ~= Planner.SOURCE_AUTO then
+			local _, req = GetTrainerServiceSkillReq(i)
+			local cost = GetTrainerServiceCost(i) or 0
+			local spell = r[F.SPELL]
+			local old = learned.trainer[spell]
+			if req and (not old or old[1] ~= req or old[2] ~= cost) then
+				if r[F.SOURCE] ~= Planner.SOURCE_TRAINER or r[F.LEARN] ~= req or r[F.COST] ~= cost then
+					changed = changed + 1
+				end
+				learned.trainer[spell] = {req, cost}
+			end
+		end
+	end
+	if changed > 0 then
+		LearnedSomething(changed)
+	end
+end
+
 -- Events
 local events = CreateFrame("Frame")
+SP.eventFrame = events -- for tools/smoke_test.py
+events:RegisterEvent("MERCHANT_SHOW")
+events:RegisterEvent("MERCHANT_UPDATE")
+events:RegisterEvent("TRAINER_SHOW")
+events:RegisterEvent("TRAINER_UPDATE")
 events:RegisterEvent("ADDON_LOADED")
 events:RegisterEvent("PLAYER_LOGIN")
 events:RegisterEvent("TRADE_SKILL_SHOW")
@@ -371,8 +543,13 @@ events:SetScript("OnEvent", function(_, event, arg1)
 		elseif arg1 == "Blizzard_TradeSkillUI" and SP.AttachTradeSkillButton then
 			SP:AttachTradeSkillButton()
 		end
+	elseif event == "MERCHANT_SHOW" or event == "MERCHANT_UPDATE" then
+		ScanMerchant()
+	elseif event == "TRAINER_SHOW" or event == "TRAINER_UPDATE" then
+		ScanTrainer()
 	elseif event == "PLAYER_LOGIN" then
 		InitNames()
+		SP:ApplyLearned()
 		if IsAddOnLoaded("Blizzard_TradeSkillUI") and SP.AttachTradeSkillButton then
 			SP:AttachTradeSkillButton()
 		end
