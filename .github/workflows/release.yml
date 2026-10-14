@@ -1,0 +1,96 @@
+name: Release
+
+# A release is a version tag (e.g. v1.1.0) on a commit that is on main:
+#   git checkout main && git pull
+#   git tag v1.1.0 && git push origin v1.1.0
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # full history + tags for the changelog
+
+      - name: Check tag
+        id: meta
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::Tag $TAG does not point to a commit on main"
+            exit 1
+          fi
+
+          TOC_VERSION=$(sed -n 's/^## Version: *//p' ProfessionPath/ProfessionPath.toc | tr -d '\r')
+          if [ "$VERSION" != "$TOC_VERSION" ]; then
+            echo "::error::Tag $TAG does not match ProfessionPath.toc version $TOC_VERSION"
+            exit 1
+          fi
+
+          PREV_TAG=$(git describe --tags --abbrev=0 --match "v*" "${GITHUB_SHA}^" 2>/dev/null || true)
+
+          {
+            echo "tag=$TAG"
+            echo "version=$VERSION"
+            echo "prev_tag=$PREV_TAG"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build zip
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir dist
+          # git archive only packs tracked files; the zip contains just the addon folder
+          git archive --format=zip -o "dist/ProfessionPath-v${VERSION}.zip" HEAD ProfessionPath
+          ls -l dist
+
+      - name: Release notes
+        env:
+          TAG: ${{ steps.meta.outputs.tag }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          PREV_TAG: ${{ steps.meta.outputs.prev_tag }}
+          REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+        run: |
+          set -euo pipefail
+          {
+            echo "**ProfessionPath ${VERSION}** for WoW 3.3.5a"
+            echo
+            echo "## Changes"
+            echo
+            if [ -n "$PREV_TAG" ]; then
+              git log --no-merges --reverse --pretty="- %s (%h)" "${PREV_TAG}..${TAG}"
+              echo
+              echo "Full diff: ${REPO_URL}/compare/${PREV_TAG}...${TAG}"
+            else
+              echo "First release. See the [README](${REPO_URL}/blob/${TAG}/README.md) for what the addon does."
+            fi
+            echo
+            echo "## Installation"
+            echo
+            echo "1. Extract \`ProfessionPath-v${VERSION}.zip\` into \`Interface/AddOns/\` (replace an existing \`ProfessionPath\` folder)."
+            echo "2. Restart the client completely - WoW 3.3.5a only picks up new files after a restart, \`/reload\` is not enough."
+          } > notes.md
+          cat notes.md
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.meta.outputs.tag }}
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          gh release create "$TAG" dist/*.zip \
+            --title "v${VERSION}" \
+            --notes-file notes.md \
+            --verify-tag

@@ -28,7 +28,9 @@ language of your client.*
 
 ## Installation
 
-1. Copy the folder `ProfessionPath` into `World of Warcraft/Interface/AddOns/`.
+1. Download `ProfessionPath-vX.Y.Z.zip` from the
+   [latest release](https://github.com/SteffenKoehler/ProfessionPath/releases/latest) and
+   extract it into `World of Warcraft/Interface/AddOns/` (it contains the folder `ProfessionPath`).
 2. **Restart the game client completely.** WoW 3.3.5a only picks up new addon folders after
    a full restart; `/reload` is not enough.
 
